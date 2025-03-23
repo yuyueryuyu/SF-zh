@@ -619,7 +619,6 @@ Fixpoint mult (n m : nat) : nat :=
     | O => O
     | S n' => plus m (mult n' m)
   end.
-
 Example test_mult1: (mult 3 3) = 9.
 Proof. simpl. reflexivity.  Qed.
 
