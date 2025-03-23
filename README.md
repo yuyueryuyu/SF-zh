@@ -1,6 +1,6 @@
 《软件基础》个人学习记录。
 
-This is my personal study record, written in Chinese. 
+My personal study record for _Software Foundations_.
 
 ***
 
