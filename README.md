@@ -1,3 +1,9 @@
+《软件基础》个人学习记录。
+This is my personal study record, written in Chinese. 
+
+——————————————————————————————————————————————————————————————————————————————————————————
+
+
 # 软件基础（中译版）
 [![CircleCI](https://circleci.com/gh/Coq-zh/SF-zh.svg?style=svg)](https://circleci.com/gh/Coq-zh/SF-zh)
 
