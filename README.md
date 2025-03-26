@@ -1,3 +1,10 @@
+《软件基础》个人学习记录。
+
+My personal study record for _Software Foundations_.
+
+***
+
+
 # 软件基础（中译版）
 [![CircleCI](https://circleci.com/gh/Coq-zh/SF-zh.svg?style=svg)](https://circleci.com/gh/Coq-zh/SF-zh)
 
