@@ -10,7 +10,7 @@ I am currently working on Vol 1: LF.
 | Basics | √ |
 | Induction | √ |
 | Lists | √ |
-| Poly | √ (Except _implicit_args_) |
+| Poly | √ |
 | ... | X |
 
 
