@@ -1,14 +1,16 @@
 《软件基础》个人学习记录。请不要把这当作是一份习题解答(
 
 My personal study record for _Software Foundations_.
-Please do not treat this as an exercise solusion. 
+Please do not treat this as an exercise solution. 
 
+
+I am currently working on Vol 1: LF.
 | 章节 | 进度 |
 | --- | --- |
 | Basics | √ |
 | Induction | √ |
 | Lists | √ |
-| Poly | √ |
+| Poly | √ (Except _implicit_args_) |
 | ... | X |
 
 
