@@ -11,6 +11,7 @@ I am currently working on Vol 1: LF.
 | Induction | √ |
 | Lists | √ |
 | Poly | √ |
+| Tactics | √ |
 | ... | X |
 
 
