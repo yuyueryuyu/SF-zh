@@ -12,6 +12,7 @@ I am currently working on Vol 1: LF.
 | Lists | √ |
 | Poly | √ |
 | Tactics | √ |
+| Logic | √ |
 | ... | X |
 
 
