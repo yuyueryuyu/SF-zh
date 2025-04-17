@@ -2,7 +2,6 @@
 
 Set Warnings "-notation-overridden,-parsing".
 From LF Require Export Logic.
-Require Coq.omega.Omega.
 
 (* ################################################################# *)
 (** * 归纳定义的命题 *)
@@ -130,7 +129,10 @@ Qed.
 Theorem ev_double : forall n,
   ev (double n).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n. induction n as [| n' IHn'].
+  - simpl. apply ev_0.
+  - simpl. apply ev_SS. apply IHn'.
+Qed.   
 (** [] *)
 
 (* ################################################################# *)
@@ -282,7 +284,10 @@ Theorem one_not_even' : ~ ev 1.
 Theorem SSSSev__even : forall n,
   ev (S (S (S (S n)))) -> ev n.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n H. inversion H as [| n' H' IH'].
+  inversion H' as [| n'' H'' IH''].
+  apply H''.
+Qed.
 (** [] *)
 
 (** **** 练习：1 星, standard (ev5_nonsense) 
@@ -292,7 +297,8 @@ Proof.
 Theorem ev5_nonsense :
   ev 5 -> 2 + 2 = 9.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros H. inversion H. inversion H1. inversion H3.
+Qed.
 (** [] *)
 
 (** The [inversion] tactic does quite a bit of work. For
@@ -425,7 +431,10 @@ Qed.
 (** **** 练习：2 星, standard (ev_sum)  *)
 Theorem ev_sum : forall n m, ev n -> ev m -> ev (n + m).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m Hn Hm. induction Hn as [|n' Hn' IHn'].
+  - simpl. apply Hm.
+  - simpl. apply ev_SS. apply IHn'.
+Qed.    
 (** [] *)
 
 (** **** 练习：4 星, advanced, optional (ev'_ev) 
@@ -443,7 +452,19 @@ Inductive ev' : nat -> Prop :=
 
 Theorem ev'_ev : forall n, ev' n <-> ev n.
 Proof.
- (* 请在此处解答 *) Admitted.
+  intros n. split.
+  - intros H. induction H as [| | n' m' Hn Hm IHn IHm].
+    + apply ev_0. 
+    + apply ev_SS. apply ev_0.
+    + apply ev_sum.
+      * apply Hm.
+      * apply IHm.
+  - intros H. induction H as [| n' Hn IHn].
+    + apply ev'_0.
+    + apply (ev'_sum 2 n').
+      * apply ev'_2.
+      * apply IHn.
+Qed.        
 (** [] *)
 
 (** **** 练习：3 星, advanced, recommended (ev_ev__ev) 
@@ -453,7 +474,10 @@ Proof.
 Theorem ev_ev__ev : forall n m,
   ev (n+m) -> ev n -> ev m.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m H0 H1. induction H1 as [| n' Hn' IHn'].
+  - simpl in H0. apply H0.
+  - simpl in H0. apply IHn'. apply evSS_ev. apply H0.
+Qed.   
 (** [] *)
 
 (** **** 练习：3 星, standard, optional (ev_plus_plus) 
@@ -464,7 +488,14 @@ Proof.
 Theorem ev_plus_plus : forall n m p,
   ev (n+m) -> ev (n+p) -> ev (m+p).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m p H1 H2. apply (ev_sum (n+p)) in H1.
+  - rewrite plus_assoc in H1. rewrite (plus_comm (n+p) (n)) in H1. 
+    rewrite plus_assoc in H1. rewrite <- plus_assoc in H1. 
+    apply (ev_ev__ev (n+n) (p+m)) in H1.
+    + rewrite plus_comm in H1. apply H1.
+    + apply ev_even_iff. exists n. symmetry. apply double_plus.
+  - apply H2. 
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -542,6 +573,15 @@ Inductive next_ev : nat -> nat -> Prop :=
 (* 请在此处解答
 
     [] *)
+Inductive total_relation : nat -> nat -> Prop :=
+  | tot n m : total_relation n m.
+
+Theorem total_relation_true : forall (n m : nat),
+  total_relation n m.
+Proof.
+  intros n m.
+  apply (tot n m).
+Qed.
 
 (** **** 练习：2 星, standard, optional (empty_relation) 
 
@@ -550,6 +590,18 @@ Inductive next_ev : nat -> nat -> Prop :=
 (* 请在此处解答
 
     [] *)
+Inductive empty_relation_other : nat -> nat -> Prop :=
+  .
+(* 以上这个定义由于没有构造子，所以对所有n m永远为假。  
+   初始答案为下方这个定义。一开始没有想到，在这里进行记录 *)
+Inductive empty_relation : nat -> nat -> Prop :=
+  | ept n m (H: False): empty_relation n m.
+
+Theorem empty_relation_true : forall (n m : nat),
+  ~(empty_relation n m).
+Proof.
+  intros n m. unfold not. intros H. inversion H. apply H0.
+Qed.
 
 (** From the definition of [le], we can sketch the behaviors of
     [destruct], [inversion], and [induction] on a hypothesis [H]
@@ -570,57 +622,119 @@ Inductive next_ev : nat -> nat -> Prop :=
 
 Lemma le_trans : forall m n o, m <= n -> n <= o -> m <= o.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros m n o H1 H2. generalize dependent m.
+  induction H2 as [| o' Ho' IHo'].
+  - intros m H1. apply H1.
+  - intros m H1. apply le_S. apply IHo'. apply H1.        
+Qed.
 
 Theorem O_le_n : forall n,
   0 <= n.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n. induction n as [| n' IHn'].
+  - apply le_n.
+  - apply (le_trans 0 n' (S n')).
+    + apply IHn'.
+    + apply le_S. apply le_n.
+Qed.   
 
 Theorem n_le_m__Sn_le_Sm : forall n m,
   n <= m -> S n <= S m.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m H. induction H.
+  - apply le_n.
+  - apply le_S. apply IHle.
+Qed.   
 
 Theorem Sn_le_Sm__n_le_m : forall n m,
   S n <= S m -> n <= m.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m H. inversion H.
+  - apply le_n.
+  - apply (le_trans n (S n) m).
+    + apply le_S. apply le_n.
+    + apply H1.
+Qed.           
 
 Theorem le_plus_l : forall a b,
   a <= a + b.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros a b. induction b.
+  - rewrite <- plus_n_O. apply le_n.
+  - apply (le_trans a (a+b) (a+S b)).
+    + apply IHb.
+    + rewrite <- plus_n_Sm. apply le_S. apply le_n.
+Qed.   
 
 Theorem plus_le : forall n1 n2 m,
   n1 + n2 <= m ->
   n1 <= m /\ n2 <= m.
 Proof.
- (* 请在此处解答 *) Admitted.
+  intros n1 n2 m H. split.
+  - apply (le_trans n1 (n1+n2) m).
+    + apply le_plus_l.
+    + apply H.
+  - apply (le_trans n2 (n1+n2) m).
+    + rewrite plus_comm. apply le_plus_l.
+    + apply H.
+Qed.    
 
 (** Hint: the next one may be easiest to prove by induction on [n]. *)
 
 Theorem add_le_cases : forall n m p q,
     n + m <= p + q -> n <= p \/ m <= q.
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros n m p q H. 
+  induction n as [| n' IHn].
+  - left. apply O_le_n.
+  - destruct IHn as [IHn1 | IHn2].
+    + rewrite plus_comm in H. rewrite <- plus_n_Sm in H.
+      apply (plus_le 1 (m+n') (p+q)) in H.
+      destruct H as [H1 H2].
+      rewrite plus_comm in H2.
+      apply H2.
+    + destruct IHn1.
+      * right. rewrite plus_comm in H.
+        rewrite <- plus_n_Sm in H. rewrite plus_comm in H.
+        rewrite -> plus_n_Sm in H. induction n'.
+        { rewrite plus_comm in H. rewrite <- plus_n_O in H.
+          rewrite plus_comm in H. rewrite <- plus_n_O in H.
+          apply le_S in H. apply Sn_le_Sm__n_le_m. apply H. }
+        { apply IHn'. apply Sn_le_Sm__n_le_m. rewrite plus_comm.
+          rewrite plus_n_Sm. rewrite plus_comm.
+          rewrite (plus_comm n' q). rewrite plus_n_Sm.
+          rewrite (plus_comm q (S n')). apply H. }
+      * left. apply n_le_m__Sn_le_Sm. apply IHn1.
+    + right. apply IHn2.  
+Qed.
 
 Theorem lt_S : forall n m,
   n < m ->
   n < S m.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m H. unfold lt. unfold lt in H. apply le_S in H. apply H.
+Qed.
 
 Theorem plus_lt : forall n1 n2 m,
   n1 + n2 < m ->
   n1 < m /\ n2 < m.
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros n1 n2 m. unfold lt. intros H. split.
+  - rewrite plus_comm in H. rewrite plus_n_Sm in H. apply plus_le in H.
+    destruct H as [H1 H2]. apply H2.
+  - rewrite plus_n_Sm in H. apply plus_le in H. destruct H as [H1 H2].
+    apply H2.
+Qed.   
 
 Theorem leb_complete : forall n m,
   n <=? m = true -> n <= m.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n. induction n as [| n' IHn'].
+  - intros m H. apply O_le_n.
+  - intros m H. destruct m as [| m'] eqn:Em.
+    + simpl in H. discriminate H.
+    + simpl in H. apply n_le_m__Sn_le_Sm. apply IHn'. apply H.
+Qed.    
 
 (** 提示：在下面的问题中，对 [m] 进行归纳会使证明容易一些。*)
 
@@ -628,21 +742,34 @@ Theorem leb_correct : forall n m,
   n <= m ->
   n <=? m = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m H. generalize dependent n. induction m as [| m' IHm'].
+  - intros n H. inversion H.
+    + reflexivity.
+  - intros n H. destruct n as [| n'] eqn:En.
+    + simpl. reflexivity.
+    + simpl. apply IHm'. apply Sn_le_Sm__n_le_m. apply H.
+Qed.     
 
 (** 提示：以下定理可以不使用 [induction] 而证明。*)
 
 Theorem leb_true_trans : forall n m o,
   n <=? m = true -> m <=? o = true -> n <=? o = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m o H1 H2. apply leb_complete in H1. apply leb_complete in H2.
+  apply leb_correct. apply (le_trans n m o).
+  - apply H1.
+  - apply H2.
+Qed.  
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (leb_iff)  *)
 Theorem leb_iff : forall n m,
   n <=? m = true <-> n <= m.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros n m. split.
+  - apply leb_complete.
+  - apply leb_correct.
+Qed. 
 (** [] *)
 
 Module R.
@@ -669,7 +796,20 @@ Inductive R : nat -> nat -> nat -> Prop :=
       简要（一句话）解释你的答案。 *)
 
 (* 请在此处解答 *)
+Example R_ex1 : R 1 1 2.
+Proof. 
+  apply (c3 1 0 1). apply (c2 0 0 0). apply c1.
+Qed.
 
+(* [R 2 2 6] 不可被证明，要证明关于R的命题，必须满足m+n=o.
+  c1 : R 0 0 0 默认成立
+  c2 可以让 m 和 o 同时-1
+  c3 可以让 n 和 o 同时-1
+  c4 可以让 m n 分别+1 o+2
+  c5 可以交换m n的值
+  注意到五个规则都无法改变m+n和o的关系，因此若m+n!=o，则R 0 0 0永远无法达成。 *)
+(* 丢弃c4 c5不会改变。上面说到可证明的命题需要满足m+n=o，去掉c4和c5都不影响命题数字向0减少。*) 
+(*  *)
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_R_provability : option (nat*string) := None.
 (** [] *)
@@ -679,11 +819,34 @@ Definition manual_grade_for_R_provability : option (nat*string) := None.
     关系 [R] 其实编码了一个熟悉的函数。请找出这个函数，定义它并在 Coq 中证明他们等价。*)
 
 Definition fR : nat -> nat -> nat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+  := plus.
+
+Lemma R_O_n_n : forall n, R 0 n n.
+Proof.
+  intros n. induction n as [| n' IHn'].
+  - apply c1.
+  - apply c3. apply IHn'.
+Qed.  
 
 Theorem R_equiv_fR : forall m n o, R m n o <-> fR m n = o.
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros m n o. unfold fR. split.
+  - intros H. induction H.
+    + reflexivity.
+    + simpl. f_equal. apply IHR.
+    + rewrite <- plus_n_Sm. f_equal. apply IHR.
+    + simpl in IHR. injection IHR as IH.
+      rewrite <- plus_n_Sm in IH. injection IH as IH'. apply IH'.
+    + rewrite plus_comm. apply IHR.
+  - generalize dependent o. induction m as [| m' IHm'].
+    + intros o H. rewrite plus_O_n in H. rewrite H. apply R_O_n_n.
+    + intros o H. destruct o as [| o'] eqn:Eo.
+      * discriminate H.
+      * apply c2. rewrite plus_comm in H. rewrite <- plus_n_Sm in H.
+        injection H as H'. apply IHm'. rewrite plus_comm.
+        apply H'.
+Qed. 
+
 (** [] *)
 
 End R.
@@ -721,28 +884,44 @@ End R.
       （提示：仔细选择进行归纳的项！） *)
 
 Inductive subseq : list nat -> list nat -> Prop :=
-(* 请在此处解答 *)
+  | subseq_same l2: subseq [] l2 
+  | subseq_l1 (l1: list nat) (h2: nat) (t2: list nat) (H: subseq l1 t2) : subseq l1 (h2::t2)
+  | subseq_h_t (t1:list nat) (t2:list nat) (h: nat) (H: subseq t1 t2) : subseq (h::t1) (h::t2)
 .
 
 Theorem subseq_refl : forall (l : list nat), subseq l l.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros l. induction l as [| h t IHl].
+  - apply subseq_same. 
+  - apply subseq_h_t. apply IHl.
+Qed.  
 
 Theorem subseq_app : forall (l1 l2 l3 : list nat),
   subseq l1 l2 ->
   subseq l1 (l2 ++ l3).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros l1 l2 l3 H. induction H as [|l1' h' t' Hl' IHl'| h1' t1' h2' t2' Hl']. 
+  - apply subseq_same.
+  - simpl. apply subseq_l1. apply IHl'.
+  - simpl. apply subseq_h_t. apply Hl'.
+Qed.
 
 Theorem subseq_trans : forall (l1 l2 l3 : list nat),
   subseq l1 l2 ->
   subseq l2 l3 ->
   subseq l1 l3.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros l1 l2 l3 H1 H2. generalize dependent l1. induction H2 as [|l2' |].
+  - intros l1 H1. inversion H1. apply subseq_same.
+  - intros l1 H1. apply subseq_l1. apply IHsubseq. apply H1.
+  - intros l1 H1. inversion H1.
+    + apply subseq_same.
+    + apply subseq_l1. apply IHsubseq. apply H3.
+    + apply subseq_h_t. apply IHsubseq. apply H3.
+Qed.
 (** [] *)
 
-(** **** 练习：2 星, standard, optional (R_provability2) 
+(** **** 练习：2 星, standard, optiona l (R_provability2) 
 
     假设我们在 Coq 中有如下定义：
 
@@ -758,8 +937,19 @@ Proof.
     - [R 6 [3;2;1;0]]  *)
 
 (* 请在此处解答
-
+第一个可以证明。
+第二个无法证明。 因为首先列表不能被改变，且n在无法通过c2规约的时候只能增加，
+1只能被0用c2归约，所以无法被证明
+第三个无法被证明，和第二个理由相同。
     [] *)
+
+Inductive R : nat -> list nat -> Prop :=
+| c1 : R 0 []
+| c2 n l (H: R n l) : R (S n) (n :: l)
+| c3 n l (H: R (S n) l) : R n l.
+
+Example R_1: R 2 [1;0].
+Proof. apply c2. apply c2. apply c1. Qed. 
 
 (* ################################################################# *)
 (** * 案例学习：正则表达式 *)
@@ -949,14 +1139,17 @@ Qed.
 Lemma empty_is_empty : forall T (s : list T),
   ~ (s =~ EmptySet).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros T s. unfold not. intros H. inversion H.
+Qed. 
 
 Lemma MUnion' : forall T (s : list T) (re1 re2 : reg_exp T),
   s =~ re1 \/ s =~ re2 ->
   s =~ Union re1 re2.
 Proof.
-  (* 请在此处解答 *) Admitted.
-
+  intros T s re1 re2 [H1 | H2].
+  - apply MUnionL. apply H1.
+  - apply MUnionR. apply H2.
+Qed.   
 (** 接下来的引理使用了 [Poly] 一章中出现的 [fold] 函数：
     如果 [ss : list (list T)] 表示一个字符串序列 [s1, ..., sn]，那么
     [fold app ss []] 是将所有字符串连接的结果。*)
@@ -965,7 +1158,13 @@ Lemma MStar' : forall T (ss : list (list T)) (re : reg_exp T),
   (forall s, In s ss -> s =~ re) ->
   fold app ss [] =~ Star re.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros T ss re H. induction ss as [|hs ts IHss].
+  - simpl. apply MStar0.
+  - simpl. apply MStarApp. 
+    + apply H. simpl. left. reflexivity.
+    + apply IHss. intros s H'. apply H. simpl.
+      right. apply H'.
+Qed.    
 (** [] *)
 
 (** **** 练习：4 星, standard, optional (reg_exp_of_list_spec) 
@@ -975,7 +1174,20 @@ Proof.
 Lemma reg_exp_of_list_spec : forall T (s1 s2 : list T),
   s1 =~ reg_exp_of_list s2 <-> s1 = s2.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros T s1 s2. split.
+  - generalize dependent s1. induction s2 as [| h2 t2 IHs2].
+    + intros s1 H. simpl in H. inversion H. reflexivity.
+    + intros s1 H. simpl in H. inversion H. inversion H3. simpl.
+      f_equal. apply IHs2. apply H4.
+  - generalize dependent s1. induction s2 as [| h2 t2 IHs2].
+    + intros s1 H. rewrite H. simpl. apply MEmpty.
+    + intros s1 H. rewrite H. simpl. 
+      replace (h2::t2) with ([h2]++t2).
+      apply MApp.
+      * apply MChar.
+      * apply IHs2. reflexivity.
+      * simpl. reflexivity.
+Qed.
 (** [] *)
 
 (** 由于 [exp_match] 以递归方式定义，我们可能会发现
@@ -1057,14 +1269,44 @@ Qed.
 
     请编写一个递归函数 [re_not_empty] 用来测试某个正则表达式是否会匹配一些字符串。
     并证明你的函数是正确的。*)
-
+Search (bool).
 Fixpoint re_not_empty {T : Type} (re : reg_exp T) : bool
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+  := match re with
+    | EmptySet => false
+    | EmptyStr => true
+    | Char x => true
+    | App re1 re2 => re_not_empty re1 && re_not_empty re2
+    | Union re1 re2 => re_not_empty re1 || re_not_empty re2
+    | Star re => true
+    end.
 
 Lemma re_not_empty_correct : forall T (re : reg_exp T),
   (exists s, s =~ re) <-> re_not_empty re = true.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros T re. split.
+  - intros [s H]. induction H.
+    + simpl. reflexivity.
+    + simpl. reflexivity.
+    + simpl. apply andb_true_iff. split. apply IHexp_match1. apply IHexp_match2.
+    + simpl. apply orb_true_iff. left. apply IHexp_match.
+    + simpl. apply orb_true_iff. right. apply IHexp_match.
+    + simpl. reflexivity.
+    + simpl. reflexivity.
+  - intros H. induction re.
+    + inversion H.
+    + exists []. apply MEmpty.
+    + exists [t]. apply MChar.
+    + simpl in H. rewrite andb_true_iff in H. destruct H as [H1 H2].
+      destruct IHre1 as [s1 H1']. apply H1.
+      destruct IHre2 as [s2 H2']. apply H2.
+      exists (s1++s2). apply MApp. apply H1'. apply H2'.
+    + simpl in H. rewrite orb_true_iff in H. destruct H as [H1 | H2].
+      * destruct IHre1 as [s1 H1']. apply H1. exists s1.
+        apply MUnionL. apply H1'.
+      * destruct IHre2 as [s2 H2']. apply H2. exists s2.
+        apply MUnionR. apply H2'.
+    + exists []. apply MStar0.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
