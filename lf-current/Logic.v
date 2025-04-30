@@ -593,7 +593,7 @@ Qed.
     特别来说，[rewrite] 和 [reflexivity] 不仅可以用于相等关系，还可用于
     [iff] 语句。为了开启此行为，我们需要导入 Coq 库来支持它： *)
 
-From Coq Require Import Setoids.Setoid.
+From Stdlib Require Import Setoids.Setoid.
 
 (** “广集（Setoid）”指配备了等价关系的集合，即满足自反性、对称性和传递性的关系。
     当一个集合中的两个元素在这种关系上等价时，可以用 [rewrite]

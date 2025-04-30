@@ -162,7 +162,7 @@ Proof. simpl. reflexivity.  Qed.
     the [String] module from the standard library.  We'll use strings
     ourselves in later chapters, but we need to [Require] it here so
     that the grading scripts can use it for internal purposes. *)
-From Coq Require Export String.
+From Stdlib Require Export String.
 
 (* ================================================================= *)
 (** ** 布尔值 *)
