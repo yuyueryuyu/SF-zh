@@ -14,6 +14,7 @@ I am currently working on Vol 1: LF.
 | Tactics | √ |
 | Logic | √ |
 | IndProp | √ |
+| Maps | √ |
 | ... | X |
 
 

@@ -20,11 +20,11 @@
     因为我们一直小心地将自己的定义和定理的命名与标准库中的部分保持一致，
     无论它们在哪里重复。 *)
 
-From Coq Require Import Arith.Arith.
-From Coq Require Import Bool.Bool.
-Require Export Coq.Strings.String.
-From Coq Require Import Logic.FunctionalExtensionality.
-From Coq Require Import Lists.List.
+From Stdlib Require Import Arith.Arith.
+From Stdlib Require Import Bool.Bool.
+Require Export Stdlib.Strings.String.
+From Stdlib Require Import Logic.FunctionalExtensionality.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
 (** 标准库的文档见
@@ -186,7 +186,7 @@ Proof. reflexivity. Qed.
 Lemma t_apply_empty : forall (A : Type) (x : string) (v : A),
     (_ !-> v) x = v.
 Proof.
-  (* 请在此处解答 *) Admitted.
+intros A x v. reflexivity. Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (t_update_eq) 
@@ -198,7 +198,8 @@ Proof.
 Lemma t_update_eq : forall (A : Type) (m : total_map A) x v,
     (x !-> v ; m) x = v.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A m x v. unfold t_update. rewrite <- eqb_string_refl. reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (t_update_neq) 
@@ -211,7 +212,10 @@ Theorem t_update_neq : forall (A : Type) (m : total_map A) x1 x2 v,
     x1 <> x2 ->
     (x1 !-> v ; m) x2 = m x2.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A m x1 x2 v H. unfold t_update. destruct (eqb_string x1 x2) eqn:Eh.
+  - exfalso. apply H. apply eqb_string_true_iff in Eh. apply Eh.
+  - reflexivity.
+Qed. 
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (t_update_shadow) 
@@ -223,7 +227,11 @@ Proof.
 Lemma t_update_shadow : forall (A : Type) (m : total_map A) x v1 v2,
     (x !-> v2 ; x !-> v1 ; m) = (x !-> v2 ; m).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A m x v1 v2. apply functional_extensionality. intros x0.
+  unfold t_update. destruct (eqb_string x x0) eqn:Ex.
+  - reflexivity. 
+  - reflexivity.
+Qed.     
 (** [] *)
 
 (** 对于最后两个全映射的引理而言，用 [IndProp] 一章中引入的互映法
@@ -237,7 +245,10 @@ Proof.
 Lemma eqb_stringP : forall x y : string,
     reflect (x = y) (eqb_string x y).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros x y. destruct (eqb_string x y) eqn:Ex.
+  - apply eqb_string_true_iff in Ex. apply ReflectT. apply Ex.
+  - apply eqb_string_false_iff in Ex. apply ReflectF. apply Ex.
+Qed.
 (** [] *)
 
 (** 现在，给定 [string] 类型的字符串 [x1] 和 [x2]，我们可以在使用策略
@@ -254,7 +265,12 @@ Proof.
 Theorem t_update_same : forall (A : Type) (m : total_map A) x,
     (x !-> m x ; m) = m.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A m x. apply functional_extensionality. intros x0.
+  unfold t_update.
+  destruct (eqb_stringP x x0).
+  - rewrite e. reflexivity.
+  - reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard, recommended (t_update_permute) 
@@ -269,7 +285,15 @@ Theorem t_update_permute : forall (A : Type) (m : total_map A)
     =
     (x2 !-> v2 ; x1 !-> v1 ; m).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros A m v1 v2 x1 x2 H. apply functional_extensionality.
+  intros x. unfold t_update. destruct (eqb_stringP x1 x).
+  - destruct (eqb_stringP x2 x).
+    + rewrite e in H. rewrite e0 in H. destruct H. reflexivity.
+    + reflexivity.
+  - destruct (eqb_stringP x2 x).
+    + reflexivity.
+    + reflexivity.
+Qed. 
 (** [] *)
 
 (* ################################################################# *)
