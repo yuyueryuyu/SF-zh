@@ -19,13 +19,13 @@
     _'霍尔逻辑（Hoare Logic）'_，它是一种广泛用于推理指令式程序的逻辑。 *)
 
 Set Warnings "-notation-overridden,-parsing".
-From Coq Require Import Bool.Bool.
-From Coq Require Import Init.Nat.
-From Coq Require Import Arith.Arith.
-From Coq Require Import Arith.EqNat.
-From Coq Require Import omega.Omega.
-From Coq Require Import Lists.List.
-From Coq Require Import Strings.String.
+From Stdlib Require Import Bool.Bool.
+From Stdlib Require Import Init.Nat.
+From Stdlib Require Import Arith.Arith.
+From Stdlib Require Import Arith.EqNat.
+From Stdlib Require Import Lia.
+From Stdlib Require Import Lists.List.
+From Stdlib Require Import Strings.String.
 Import ListNotations.
 
 From LF Require Import Maps.
@@ -333,7 +333,7 @@ Proof.
 
       T; [T1 | T2 | ... | Tn]
 
-   就是一个首先执行 [T]，然后在 [T] 生成的第一个字母表中执行 [T1]，
+   就是一个首先执行 [T]，然后在 [T] 生成的第一个子目标中执行 [T1]，
    在第二个子目标中执行 [T2]，以此类推。
 
    因此，[T;T'] 只是一种当所有 [Ti] 为相同策略时的特殊记法，即，[T;T']
@@ -376,13 +376,26 @@ Qed.
     [bexp] 的值。请编写一个对 [bexp] 执行此变换的函数，并证明它的可靠性。
     利用我们刚学过的泛策略来构造一个尽可能优雅的证明。 *)
 
-Fixpoint optimize_0plus_b (b : bexp) : bexp
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint optimize_0plus_b (b : bexp) : bexp :=
+  match b with
+  | BTrue       => BTrue
+  | BFalse      => BFalse
+  | BEq a1 a2   => BEq (optimize_0plus a1) (optimize_0plus a2)
+  | BLe a1 a2   => BLe (optimize_0plus a1) (optimize_0plus a2)
+  | BNot b1     => BNot (optimize_0plus_b b1)
+  | BAnd b1 b2  => BAnd (optimize_0plus_b b1) (optimize_0plus_b b2)
+  end.
 
 Theorem optimize_0plus_b_sound : forall b,
   beval (optimize_0plus_b b) = beval b.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros b. 
+  induction b;
+    try reflexivity;
+    try (simpl; repeat (rewrite optimize_0plus_sound); reflexivity);
+    try (simpl; rewrite IHb; reflexivity);
+    try (simpl; rewrite IHb1; rewrite IHb2; reflexivity).
+Qed. 
 (** [] *)
 
 (** **** 练习：4 星, standard, optional (optimize) 
@@ -394,7 +407,136 @@ Proof.
 (* 请在此处解答
 
     [] *)
+Fixpoint optimize_aexp (a:aexp) : aexp :=
+match a with
+| ANum n => ANum n
+| APlus (ANum n) (ANum m) => ANum (n+m)
+| APlus (ANum 0) e2 => optimize_aexp e2
+| APlus e1 (ANum 0) => optimize_aexp e1
+| APlus  e1 e2 => APlus  (optimize_aexp e1) (optimize_aexp e2)
+| AMinus (ANum n) (ANum m) => ANum (n-m)
+| AMinus (ANum 0) _ => ANum 0
+| AMinus e1 (ANum 0) => optimize_aexp e1
+| AMinus e1 e2 => AMinus (optimize_aexp e1) (optimize_aexp e2)
+| AMult (ANum n) (ANum m) => ANum (n*m)
+| AMult (ANum 0) _ => ANum 0
+| AMult _ (ANum 0) => ANum 0
+| AMult (ANum 1) e2 => optimize_aexp e2
+| AMult e1 (ANum 1) => optimize_aexp e1
+| AMult  e1 e2 => AMult  (optimize_aexp e1) (optimize_aexp e2)
+end.
 
+Theorem optimize_aexp_sound : forall a,
+  aeval(a) = aeval(optimize_aexp a).
+Proof.
+  intros a.
+  induction a;
+    try reflexivity.
+  - destruct a1;
+    try(destruct a2;
+      try (destruct n; try reflexivity);
+      try (destruct n; try (simpl in *; rewrite <- IHa2; reflexivity));
+      try (simpl in *; rewrite <- IHa2; reflexivity);
+      try (simpl in *; rewrite <- IHa1; simpl; reflexivity);
+      try (simpl in *; rewrite <- IHa1; rewrite <- plus_n_O; reflexivity);
+      try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity)).
+  - destruct a1.
+    try (destruct a2;
+      try (destruct n; try reflexivity);
+      try (destruct n; try (simpl in *; rewrite <- IHa2; reflexivity));
+      try (simpl; reflexivity);
+      try (simpl in *; rewrite <- IHa2; reflexivity);
+      try (simpl in *; rewrite <- IHa1; reflexivity);
+      try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity)).
+      + destruct a2; try (simpl in *; destruct n;
+        try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+        try (simpl in *; rewrite <- IHa1; rewrite Nat.sub_0_r; reflexivity);
+        try (simpl in *; rewrite <- IHa1; reflexivity);
+        try (simpl in *; rewrite <- IHa2; reflexivity));
+      try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity).
+      + destruct a2; try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+      try (simpl in *; destruct n;
+      try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+      try (simpl in *; rewrite <- IHa1; rewrite Nat.sub_0_r; reflexivity);
+      try (simpl in *; rewrite <- IHa1; reflexivity);
+      try (simpl in *; rewrite <- IHa2; reflexivity)).
+      + destruct a2; try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+      try (simpl in *; destruct n;
+      try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+      try (simpl in *; rewrite <- IHa1; rewrite Nat.sub_0_r; reflexivity);
+      try (simpl in *; rewrite <- IHa1; reflexivity);
+      try (simpl in *; rewrite <- IHa2; reflexivity)).
+  -destruct a1.
+  try (destruct a2;
+    try (destruct n; try reflexivity);
+    try (destruct n; try (simpl in *; rewrite <- IHa2; reflexivity));
+    try (simpl; reflexivity);
+    try (simpl in *; rewrite <- IHa2; reflexivity);
+    try (simpl in *; rewrite <- IHa1; reflexivity);
+    try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+    try (simpl in *; rewrite <- IHa2; rewrite plus_n_O; reflexivity)).
+  
+    
+    
+    
+    +destruct a2; try (simpl in *; destruct n;
+      try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+      try (simpl in *; rewrite <- IHa1; rewrite Nat.mul_1_r; reflexivity);
+      try (simpl in *; rewrite <- IHa1; reflexivity);
+      try (simpl in *; rewrite <- IHa2; reflexivity));
+    try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+    try (simpl in *; rewrite <- mult_n_O; reflexivity);
+    try (simpl in *; rewrite <- Nat.mul_1_r; reflexivity).
+    destruct n. simpl in *. rewrite <- IHa1. rewrite Nat.mul_1_r. reflexivity.
+    simpl in *. rewrite <- IHa1. reflexivity.
+    + destruct a2; try (simpl in *; destruct n;
+    try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+    try (simpl in *; rewrite <- IHa1; rewrite Nat.mul_1_r; reflexivity);
+    try (simpl in *; rewrite <- IHa1; reflexivity);
+    try (simpl in *; rewrite <- IHa2; reflexivity));
+  try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+  try (simpl in *; rewrite <- mult_n_O; reflexivity);
+  try (simpl in *; rewrite <- Nat.mul_1_r; reflexivity).
+  destruct n. simpl in *. rewrite <- IHa1. rewrite Nat.mul_1_r. reflexivity.
+  simpl in *. rewrite <- IHa1. reflexivity.
+  +destruct a2; try (simpl in *; destruct n;
+  try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+  try (simpl in *; rewrite <- IHa1; rewrite Nat.mul_1_r; reflexivity);
+  try (simpl in *; rewrite <- IHa1; reflexivity);
+  try (simpl in *; rewrite <- IHa2; reflexivity));
+try (simpl in *; rewrite <- IHa1; rewrite <- IHa2; reflexivity);
+try (simpl in *; rewrite <- mult_n_O; reflexivity);
+try (simpl in *; rewrite <- Nat.mul_1_r; reflexivity).
+destruct n. simpl in *. rewrite <- IHa1. rewrite Nat.mul_1_r. reflexivity.
+simpl in *. rewrite <- IHa1. reflexivity.
+Qed.
+      
+
+Fixpoint optimize_bexp (b : bexp) : bexp :=
+  match b with
+  | BTrue       => BTrue
+  | BFalse      => BFalse
+  | BEq (ANum a1) (ANum a2) => if a1 =? a2 then BTrue else BFalse
+  | BEq a1 a2   => BEq (optimize_aexp a1) (optimize_aexp a2)
+  | BLe (ANum a1) (ANum a2) => if a1 <=? a2 then BTrue else BFalse
+  | BLe a1 a2   => BLe (optimize_aexp a1) (optimize_aexp a2)
+  | BNot BTrue  => BFalse
+  | BNot BFalse => BTrue
+  | BNot b1     => BNot (optimize_bexp b1)
+  | BAnd (BFalse) _ => BFalse
+  | BAnd _ (BFalse) => BFalse
+  | BAnd (BTrue) (BTrue) => BTrue
+  | BAnd b1 b2  => BAnd (optimize_bexp b1) (optimize_bexp b2)
+  end.
+
+Theorem optimize_bexp_sound : forall b, 
+  beval(b) = beval(optimize_bexp b).
+Proof.
+Admitted.
+    
+      
+  
+      
 (* ================================================================= *)
 (** ** 定义新的策略记法 *)
 
@@ -445,7 +587,7 @@ Example silly_presburger_example : forall m n o p,
   m + n <= n + o /\ o + 3 = p + 3 ->
   m <= p.
 Proof.
-  intros. omega.
+  intros. lia.
 Qed.
 
 (** （注意本文件顶部 [From Coq Require Import omega.Omega.]。）*)
@@ -633,6 +775,35 @@ Inductive aevalR : aexp -> nat -> Prop :=
     请用推理规则记法将布尔求值的定义写成关系的形式。 *)
 (* 请在此处解答 *)
 
+(* 
+                              -----------               (E_BTrue)
+                             BTrue ==> true
+                              
+                               -----------               (E_BFalse)
+                             BFalse ==> false
+                              
+                             a1 ==> n1
+                             a2 ==> n2
+                             -----------               (E_BEq)
+                             BEq a1 a2 ==> n1 =? n2
+
+                             a1 ==> n1
+                             a2 ==> n2
+                             -----------               (E_BLe)
+                             BLe a1 a2 ==> n1 <=? n2
+
+                      
+                             b1 ==> b
+                             -----------               (E_BNot)
+                             BNot b1 ==> negb b
+
+                             b1 ==> b
+                             b2 ==> c
+                             -----------              (E_BAnd)
+                             BAnd b1 b2 ==> andb b c
+
+
+*)
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_beval_rules : option (nat*string) := None.
 (** [] *)
@@ -697,13 +868,31 @@ Qed.
     用和 [aevalR] 同样的方式写出关系 [bevalR]，并证明它等价于 [beval]。 *)
 
 Inductive bevalR: bexp -> bool -> Prop :=
-(* 请在此处解答 *)
-.
+  | E_BTrue   : bevalR BTrue true
+  | E_BFalse  : bevalR BFalse false
+  | E_BEq (a1 a2: aexp) (n m: nat): 
+      aevalR a1 n -> aevalR a2 m -> bevalR (BEq a1 a2) (n =? m)
+  | E_BLe (a1 a2: aexp) (n m: nat): 
+      aevalR a1 n -> aevalR a2 m -> bevalR (BLe a1 a2) (n <=? m)
+  | E_BNot (b1: bexp) (b: bool): 
+      bevalR b1 b -> bevalR (BNot b1) (negb b)
+  | E_BAnd (b1 b2: bexp) (b c: bool): 
+      bevalR b1 b -> bevalR b2 c -> bevalR (BAnd b1 b2) (andb b c). 
 
 Lemma beval_iff_bevalR : forall b bv,
   bevalR b bv <-> beval b = bv.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  split.
+  - intros H; induction H; simpl; try constructor; 
+    try apply aeval_iff_aevalR in H; try apply aeval_iff_aevalR in H0;
+    subst; reflexivity.
+  - generalize dependent bv. 
+    induction b; simpl; intros; subst; constructor;
+    try apply aeval_iff_aevalR; try apply IHb; 
+    try apply IHb1; try apply IHb2; try reflexivity.
+Qed.  
+
+    
 (** [] *)
 
 End AExp.
