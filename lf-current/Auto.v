@@ -1,7 +1,7 @@
 (** * Auto: 更多的自动化 *)
 
 Set Warnings "-notation-overridden,-parsing".
-From Coq Require Import omega.Omega.
+From Stdlib Require Import Lia.
 From LF Require Import Maps.
 From LF Require Import Imp.
 
@@ -136,7 +136,7 @@ Qed.
 (** 我们可以为某次 [auto] 的调用扩展提示数据库，只需使用“[auto using ...]”。 *)
 
 Lemma le_antisym : forall n m: nat, (n <= m /\ m <= n) -> n = m.
-Proof. intros. omega. Qed.
+Proof. intros. lia. Qed.
 
 Example auto_example_6 : forall n m p : nat,
   (n <= p -> (n <= m /\ m <= n)) ->
@@ -167,7 +167,7 @@ Qed.
 
 (** 我们也可以定义特殊化的提示数据库，让它只在需要时激活。详情见 Coq 参考手册。 *)
 
-Hint Resolve le_antisym.
+Hint Resolve le_antisym : core.
 
 Example auto_example_6' : forall n m p : nat,
   (n<= p -> (n <= m /\ m <= n)) ->
@@ -186,12 +186,12 @@ Proof.
   auto.  (* does nothing *)
 Abort.
 
-Hint Unfold is_fortytwo.
+Hint Unfold is_fortytwo : core.
 
 Example auto_example_7' : forall x,
   (x <= 42 /\ 42 <= x) -> is_fortytwo x.
 Proof.
-  auto. (* try also: info_auto. *)
+  info_auto. (* try also: info_auto. *)
 Qed.
 
 (** 我们来初次尝试简化 [ceval_deterministic] 的证明脚本。 *)
@@ -584,9 +584,9 @@ Qed.
 (** 我们目前学过的几个策略，包括 [exists]、[constructor] 和 [auto] 都有类似的变体。
     例如，下面是一个使用了 [eauto] 的证明： *)
 
-Hint Constructors ceval.
-Hint Transparent state.
-Hint Transparent total_map.
+Hint Constructors ceval : core.
+Hint Transparent state : core.
+Hint Transparent total_map : core.
 
 Definition st12 := (Y !-> 2 ; X !-> 1).
 Definition st21 := (Y !-> 1 ; X !-> 2).
