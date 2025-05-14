@@ -525,18 +525,51 @@ Fixpoint optimize_bexp (b : bexp) : bexp :=
   | BNot b1     => BNot (optimize_bexp b1)
   | BAnd (BFalse) _ => BFalse
   | BAnd _ (BFalse) => BFalse
-  | BAnd (BTrue) (BTrue) => BTrue
+  | BAnd (BTrue) b2 => optimize_bexp b2
+  | BAnd b1 (BTrue) => optimize_bexp b1
   | BAnd b1 b2  => BAnd (optimize_bexp b1) (optimize_bexp b2)
   end.
 
 Theorem optimize_bexp_sound : forall b, 
   beval(b) = beval(optimize_bexp b).
 Proof.
-Admitted.
-    
-      
-  
-      
+  intros b. induction b; try (simpl; reflexivity).
+  - destruct (aeval a1 =? aeval a2) eqn:Ea.
+    + destruct a1; destruct a2;
+      try (simpl in *; rewrite Ea; simpl; reflexivity);
+      unfold optimize_bexp; unfold beval; 
+      rewrite <- optimize_aexp_sound;
+      rewrite <- optimize_aexp_sound;
+      rewrite Ea; reflexivity.
+    + destruct a1; destruct a2;
+      try (simpl in *; rewrite Ea; simpl; reflexivity);
+      unfold optimize_bexp; unfold beval; 
+      rewrite <- optimize_aexp_sound;
+      rewrite <- optimize_aexp_sound;
+      rewrite Ea; reflexivity.
+  - destruct (aeval a1 <=? aeval a2) eqn:Ea. 
+    + destruct a1; destruct a2;
+      try (simpl in *; rewrite Ea; simpl; reflexivity);
+      unfold optimize_bexp; unfold beval; 
+      rewrite <- optimize_aexp_sound;
+      rewrite <- optimize_aexp_sound;
+      rewrite Ea; reflexivity.
+    + destruct a1; destruct a2;
+      try (simpl in *; rewrite Ea; simpl; reflexivity);
+      unfold optimize_bexp; unfold beval; 
+      rewrite <- optimize_aexp_sound;
+      rewrite <- optimize_aexp_sound;
+      rewrite Ea; reflexivity.
+  - destruct b; try (simpl; reflexivity);
+    try (unfold optimize_bexp in *; unfold beval in *;
+      rewrite <- IHb; reflexivity).
+  - destruct b1; destruct b2; try (simpl; reflexivity);
+    try (simpl in *; rewrite IHb2; reflexivity);
+    try (simpl in *; rewrite IHb1; rewrite andb_true_r; reflexivity);
+    try (simpl in *; rewrite andb_false_r; reflexivity);
+    try (simpl in *; rewrite IHb1; rewrite IHb2; reflexivity).
+Qed.
+
 (* ================================================================= *)
 (** ** 定义新的策略记法 *)
 
@@ -1493,7 +1526,12 @@ Example ceval_example2:
     X ::= 0;; Y ::= 1;; Z ::= 2
   ]=> (Z !-> 2 ; Y !-> 1 ; X !-> 0).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply E_Seq with (X !-> 0).
+  - apply E_Ass. reflexivity.
+  - apply E_Seq with (Y !-> 1 ; X !-> 0).
+    + apply E_Ass. reflexivity.
+    + apply E_Ass. reflexivity.
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard, optional (pup_to_n) 
@@ -1501,15 +1539,39 @@ Proof.
     写一个 Imp 程序对从 [1] 到 [X] 进行求值（包括：将 [1 + 2 + ... + X]) 赋予变量 [Y]。
    证明此程序对于 [X] = [2] 会按预期执行（这可能比你预想的还要棘手）。 *)
 
-Definition pup_to_n : com
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition pup_to_n : com :=
+  (
+    Y ::= 0 ;;
+    WHILE 1 <= X DO
+      Y ::= Y + X ;;
+      X ::= X - 1
+    END
+  ).
 
 Theorem pup_to_2_ceval :
   (X !-> 2) =[
     pup_to_n
   ]=> (X !-> 0 ; Y !-> 3 ; X !-> 1 ; Y !-> 2 ; Y !-> 0 ; X !-> 2).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply E_Seq with (Y !-> 0 ; X !-> 2).
+  - apply E_Ass. reflexivity.
+  - apply E_WhileTrue with (X !-> 1 ; Y !-> 2 ; Y !-> 0 ; X !-> 2).
+    simpl. reflexivity.
+    apply E_Seq with (Y !-> 2 ; Y !-> 0 ; X !-> 2).
+    apply E_Ass. simpl. reflexivity.
+    apply E_Ass. simpl. reflexivity.
+
+    apply E_WhileTrue with (X !-> 0 ; Y !-> 3 ; X !-> 1 ; Y !-> 2 ; Y !-> 0 ; X !-> 2).
+    simpl. reflexivity.
+    apply E_Seq with (Y !-> 3 ; X !-> 1 ; Y !-> 2 ; Y !-> 0 ; X !-> 2).
+    apply E_Ass. simpl. reflexivity.
+    apply E_Ass. simpl. reflexivity.
+
+    apply E_WhileFalse.
+    simpl. reflexivity.
+Qed.
+     
+
 (** [] *)
 
 (* ================================================================= *)
@@ -1583,7 +1645,16 @@ Proof.
     叙述并证明 [XtimesYinZ] 的规范（Specification）。 *)
 
 (* 请在此处解答 *)
-
+Theorem XtimesYinZ_spec : forall st n m st',
+  st X = n ->
+  st Y = m ->
+  st =[ XtimesYinZ ]=> st' ->
+  st' Z = n * m.
+Proof.
+  intros st n m st' HX HY Heval.
+  inversion Heval.
+  subst. simpl. reflexivity.
+Qed.
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_XtimesYinZ_spec : option (nat*string) := None.
 (** [] *)
@@ -1598,8 +1669,11 @@ Proof.
 
   (** 归纳讨论假设“[loopdef] 会终止”之构造，其中多数情形的矛盾显而易见，
       可用 [discriminate] 一步解决。 *)
-
-  (* 请在此处解答 *) Admitted.
+  induction contra; try discriminate.
+  - inversion Heqloopdef. rewrite H1 in H. discriminate. 
+  - apply IHcontra2. apply Heqloopdef.
+Qed. 
+         
 (** [] *)
 
 (** **** 练习：3 星, standard (no_whiles_eqv) 
@@ -1627,13 +1701,24 @@ Close Scope imp_scope.
     [WHILE] 循环的程序时才可以证明。之后证明它与 [no_whiles] 等价。 *)
 
 Inductive no_whilesR: com -> Prop :=
- (* 请在此处解答 *)
-.
+  | no_whiles_skipR : no_whilesR SKIP
+  | no_whiles_assR var val: no_whilesR (var ::= val)
+  | no_whiles_seqR c1 c2 : no_whilesR c1 -> no_whilesR c2 -> no_whilesR (c1 ;; c2)
+  | no_whiles_ifR b ct cf : no_whilesR ct -> no_whilesR cf -> no_whilesR (TEST b THEN ct ELSE cf FI)
+  .
 
 Theorem no_whiles_eqv:
    forall c, no_whiles c = true <-> no_whilesR c.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros c. split.
+  - intros H. induction c; try constructor;
+    try (inversion H; symmetry in H1; apply andb_true_eq in H1 as [H1 H2]);
+    try (apply IHc1; symmetry; apply H1);
+    try (apply IHc2; symmetry; apply H2).
+  - intros H. induction H; try (simpl; reflexivity);
+    try (simpl; apply andb_true_intro; split); 
+    try (apply IHno_whilesR1); try(apply IHno_whilesR2).
+Qed.
 (** [] *)
 
 (** **** 练习：4 星, standard (no_whiles_terminating) 
@@ -1644,6 +1729,22 @@ Proof.
     按照你的偏好使用 [no_whiles] 或 [no_whilesR]。 *)
 
 (* 请在此处解答 *)
+
+Theorem no_whiles_terminating :
+  forall c, no_whilesR c -> forall st, exists st', st =[ c ]=> st'.
+Proof.
+  intros c H. induction H.
+  - intros st. exists st. apply E_Skip.
+  - intros st. exists (var !-> (aeval st val) ; st). apply E_Ass. reflexivity.
+  - intros st. destruct (IHno_whilesR1 st) as [st' H1].
+    destruct (IHno_whilesR2 st') as [st'' H2].
+    exists st''. apply E_Seq with st'. apply H1. apply H2.
+  - intros st. destruct (IHno_whilesR1 st) as [st' H1].
+    destruct (IHno_whilesR2 st) as [st'' H2].
+    destruct (beval st b) eqn:Eb.
+    + exists st'. apply E_IfTrue. apply Eb. apply H1.
+    + exists st''. apply E_IfFalse. apply Eb. apply H2.
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_no_whiles_terminating : option (nat*string) := None.
@@ -1701,33 +1802,60 @@ Inductive sinstr : Type :=
 
 Fixpoint s_execute (st : state) (stack : list nat)
                    (prog : list sinstr)
-                 : list nat
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+                 : list nat :=
+  match prog with
+  | [] => stack
+  | h :: t => match h with
+              | SPush n => s_execute st (n::stack) t
+              | SLoad x => s_execute st ((st x)::stack) t
+              | SPlus => match stack with
+                          | [] => s_execute st stack t
+                          | [h1] => s_execute st stack t
+                          | h1 :: h2 :: stack' => s_execute st ((h2+h1) :: stack') t
+                          end
+              | SMinus  => match stack with
+                          | [] => s_execute st stack t
+                          | [h1] => s_execute st stack t
+                          | h1 :: h2 :: stack' => s_execute st ((h2-h1) :: stack') t
+                          end
+              | SMult  => match stack with
+                          | [] => s_execute st stack t
+                          | [h1] => s_execute st stack t
+                          | h1 :: h2 :: stack' => s_execute st ((h2*h1) :: stack') t
+                          end
+              end
+end.
 
 Example s_execute1 :
      s_execute empty_st []
        [SPush 5; SPush 3; SPush 1; SMinus]
    = [2; 5].
-(* 请在此处解答 *) Admitted.
+Proof. simpl. reflexivity. Qed. 
 
 Example s_execute2 :
      s_execute (X !-> 3) [3;4]
        [SPush 4; SLoad X; SMult; SPlus]
    = [15; 4].
-(* 请在此处解答 *) Admitted.
+Proof. simpl. reflexivity. Qed.
 
 (** 接下来请编写一个将 [aexp] 编译成栈机器程序的函数。运行此程序的效果
     应当和将该表达式的值压入栈中一致。 *)
 
-Fixpoint s_compile (e : aexp) : list sinstr
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint s_compile (e : aexp) : list sinstr :=
+  match e with 
+  | ANum n => [SPush n]
+  | AId x => [SLoad x]
+  | APlus a1 a2 => s_compile a1 ++ s_compile a2 ++ [SPlus]
+  | AMinus a1 a2 => s_compile a1 ++ s_compile a2 ++ [SMinus]
+  | AMult a1 a2 => s_compile a1 ++ s_compile a2 ++ [SMult]
+  end.
 
 (** 在定义完 [s_compile] 之后，请证明以下示例来测试它是否起作用。 *)
 
 Example s_compile1 :
   s_compile (X - (2 * Y))
   = [SLoad X; SPush 2; SLoad Y; SMult; SMinus].
-(* 请在此处解答 *) Admitted.
+Proof. simpl. reflexivity. Qed.
 (** [] *)
 
 (** **** 练习：4 星, advanced (stack_compiler_correct) 
@@ -1738,11 +1866,32 @@ Example s_compile1 :
 
     请证明以下定理。你需要先陈述一个更一般的引理来得到一个有用的归纳假设，
     由它的话主定理就只是一个简单的推论了。 *)
+Lemma execute_app : forall (st : state) (str1 str2 : list sinstr) (stack : list nat),
+  s_execute st stack (str1++str2) = s_execute st (s_execute st stack str1) str2. 
+Proof.
+  intros st str1. generalize dependent st.  
+  induction str1.
+  - intros st str2 stack. simpl. reflexivity.
+  - intros st str2 stack. simpl. destruct a; 
+    try( rewrite IHstr1; reflexivity);
+    try (destruct stack); try(simpl; rewrite IHstr1; reflexivity);
+      try(destruct stack); try(rewrite IHstr1; reflexivity).
+Qed.   
+
+Theorem s_compile_correct_stk : forall (st : state) (e : aexp) (stack : list nat),
+  s_execute st stack (s_compile e) = (aeval st e) :: stack.
+Proof.
+  intros st e. generalize dependent st. induction e;
+  try (simpl; reflexivity);
+  try (simpl; intros; repeat (rewrite execute_app); 
+  rewrite IHe1; rewrite IHe2; simpl; reflexivity).
+Qed.  
 
 Theorem s_compile_correct : forall (st : state) (e : aexp),
   s_execute st [] (s_compile e) = [ aeval st e ].
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros st e. apply (s_compile_correct_stk st e []).
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard, optional (short_circuit) 
@@ -1760,6 +1909,29 @@ Proof.
 (* 请在此处解答
 
     [] *)
+
+Fixpoint beval_short_circuit (st : state) (b : bexp) : bool :=
+  match b with
+  | BTrue       => true
+  | BFalse      => false
+  | BEq a1 a2   => (aeval st a1) =? (aeval st a2)
+  | BLe a1 a2   => (aeval st a1) <=? (aeval st a2)
+  | BNot b1     => negb (beval_short_circuit st b1)
+  | BAnd BFalse _ => false
+  | BAnd b1 b2  => andb (beval_short_circuit st b1) (beval_short_circuit st b2)
+  end.
+
+Theorem short_circuit_eq : forall (st : state) (b : bexp),
+  beval st b = beval_short_circuit st b.
+Proof.
+  intros st b. induction b; try(simpl; reflexivity).
+  - simpl. rewrite IHb. reflexivity.
+  - simpl. destruct b1; try (simpl; reflexivity); 
+    try (simpl in *; rewrite IHb1; reflexivity);
+    try (simpl in *; rewrite IHb2; reflexivity).
+    try (simpl in *; rewrite IHb1; rewrite IHb2; reflexivity).
+    + rewrite IHb1. rewrite IHb2. reflexivity.
+Qed.
 
 Module BreakImp.
 (** **** 练习：4 星, advanced (break_imp) 
@@ -1850,7 +2022,31 @@ Reserved Notation "st '=[' c ']=>' st' '/' s"
 Inductive ceval : com -> state -> result -> state -> Prop :=
   | E_Skip : forall st,
       st =[ CSkip ]=> st / SContinue
-  (* 请在此处解答 *)
+  | E_Break : forall st,
+      st =[ CBreak ]=> st / SBreak
+  | E_Ass var val : forall st,
+      st =[ var ::= val ]=> (var !-> (aeval st val) ; st) / SContinue 
+  | E_SeqContinue : forall st st' st'' res c1 c2,
+      st =[ c1 ]=> st' / SContinue -> st' =[ c2 ]=> st'' / res ->
+      st =[ c1 ;; c2 ]=> st'' / res
+  | E_SeqBreak : forall st st' c1 c2,
+      st =[ c1 ]=> st' / SBreak -> 
+      st =[ c1 ;; c2 ]=> st' / SBreak  
+  | E_IfTrue : forall st st' res b ct cf,
+      beval st b = true -> st =[ ct ]=> st' / res ->
+      st =[ TEST b THEN ct ELSE cf FI ]=> st' / res
+  | E_IfFalse : forall st st' res b ct cf,
+      beval st b = false -> st =[ cf ]=> st' / res ->
+      st =[ TEST b THEN ct ELSE cf FI ]=> st' / res
+  | E_WhileFalse b c1 : forall st,
+      beval st b = false -> st =[ WHILE b DO c1 END ]=> st / SContinue
+  | E_WhileTrueBreak b c1 : forall st st',
+      beval st b = true -> st =[ c1 ]=> st' / SBreak ->
+      st =[ WHILE b DO c1 END ]=> st' / SContinue
+  | E_WhileTrueContinue b c1 : forall st st' st'' res,
+      beval st b = true -> st =[ c1 ]=> st' / SContinue ->
+      st' =[ WHILE b DO c1 END ]=> st'' / res ->
+      st =[WHILE b DO c1 END ]=> st'' / res
 
   where "st '=[' c ']=>' st' '/' s" := (ceval c st s st').
 
@@ -1860,20 +2056,27 @@ Theorem break_ignore : forall c st st' s,
      st =[ BREAK;; c ]=> st' / s ->
      st = st'.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros c st st' s H. inversion H.
+  - inversion H2.
+  - inversion H5. reflexivity.
+Qed. 
 
 Theorem while_continue : forall b c st st' s,
   st =[ WHILE b DO c END ]=> st' / s ->
   s = SContinue.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros b c st st' s H. remember (WHILE b DO c END) as W.
+  induction H; try discriminate HeqW; try reflexivity.
+  apply IHceval2. apply HeqW.
+Qed.
 
 Theorem while_stops_on_break : forall b c st st',
   beval st b = true ->
   st =[ c ]=> st' / SBreak ->
   st =[ WHILE b DO c END ]=> st' / SContinue.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros b c st st' H1 H2. apply E_WhileTrueBreak. apply H1. apply H2.
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, advanced, optional (while_break_true)  *)
@@ -1882,7 +2085,12 @@ Theorem while_break_true : forall b c st st',
   beval st' b = true ->
   exists st'', st'' =[ c ]=> st' / SBreak.
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros b c st st' H1 H2. remember (WHILE b DO c END) as W. 
+  induction H1; try discriminate HeqW.
+  - injection HeqW as H11 H22. rewrite H11 in H. rewrite H in H2. discriminate.
+  - injection HeqW as H11 H22. exists st. rewrite <- H22. apply H1.
+  - apply IHceval2. apply HeqW. apply H2.
+Qed.
 (** [] *)
 
 (** **** 练习：4 星, advanced, optional (ceval_deterministic)  *)
@@ -1891,7 +2099,39 @@ Theorem ceval_deterministic: forall (c:com) st st1 st2 s1 s2,
      st =[ c ]=> st2 / s2 ->
      st1 = st2 /\ s1 = s2.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros c st st1 st2 s1 s2 H1. generalize dependent st2. generalize dependent s2.
+  induction H1; intros s2 st2 H2;
+  try (inversion H2; split; reflexivity).
+  - inversion H2. 
+    + subst. destruct (IHceval1 SContinue st'0) as [IH1 IH2]. apply H1. 
+      assert (Eq: st' = st'0). apply IH1. rewrite <- Eq in H6. apply IHceval2.
+      apply H6.
+    + subst. destruct (IHceval1 SBreak st2). apply H5. discriminate H0.
+  - inversion H2.
+    + subst. destruct (IHceval SContinue st'0). apply H3. discriminate H0.
+    + subst. apply IHceval. apply H6.
+  - inversion H2; subst.
+    + apply IHceval. apply H9.
+    + rewrite H in H8. discriminate.
+  - inversion H2; subst.
+    + rewrite H in H8. discriminate.
+    + apply IHceval. apply H9.
+  - inversion H2; subst; 
+    try (split; reflexivity);
+    try (rewrite H in H3; discriminate).
+  - inversion H2; subst;
+    try (split; reflexivity);
+    try (rewrite H in H7; discriminate).
+    + destruct (IHceval SBreak st2) as [H11 H12].
+      apply H8. split. apply H11. reflexivity.
+    + destruct (IHceval SContinue st'0) as [H11 H12].
+      apply H5. discriminate.
+  - inversion H2; subst;
+    try (rewrite H in H6; discriminate).
+    + destruct (IHceval1 SBreak st2). apply H7. discriminate.
+    + destruct (IHceval1 SContinue st'0). apply H4.
+      apply IHceval2. rewrite <- H0 in H8. apply H8.
+Qed.
 
 (** [] *)
 End BreakImp.
@@ -1910,6 +2150,160 @@ End BreakImp.
 (* 请在此处解答
 
     [] *)
+Module ForImp.
+Inductive com : Type :=
+  | CSkip
+  | CBreak                       
+  | CAss (x : string) (a : aexp)
+  | CSeq (c1 c2 : com)
+  | CIf (b : bexp) (c1 c2 : com)
+  | CWhile (b : bexp) (c : com)
+  | CFor (init: com) (b: bexp) (last: com) (c: com).
 
+Notation "'SKIP'" :=
+  CSkip.
+Notation "'BREAK'" :=
+  CBreak.
+Notation "x '::=' a" :=
+  (CAss x a) (at level 60).
+Notation "c1 ;; c2" :=
+  (CSeq c1 c2) (at level 80, right associativity).
+Notation "'WHILE' b 'DO' c 'END'" :=
+  (CWhile b c) (at level 80, right associativity).
+Notation "'TEST' c1 'THEN' c2 'ELSE' c3 'FI'" :=
+  (CIf c1 c2 c3) (at level 80, right associativity).
+
+
+Inductive result : Type :=
+  | SContinue
+  | SBreak.
+
+Reserved Notation "st '=[' c ']=>' st' '/' s"
+         (at level 40, st' at next level).
+
+
+(** 基于以上描述，请完成 [ceval] 关系的定义。 *)
+
+Inductive ceval : com -> state -> result -> state -> Prop :=
+  | E_Skip : forall st,
+      st =[ CSkip ]=> st / SContinue
+  | E_Break : forall st,
+      st =[ CBreak ]=> st / SBreak
+  | E_Ass var val : forall st,
+      st =[ var ::= val ]=> (var !-> (aeval st val) ; st) / SContinue 
+  | E_SeqContinue : forall st st' st'' res c1 c2,
+      st =[ c1 ]=> st' / SContinue -> st' =[ c2 ]=> st'' / res ->
+      st =[ c1 ;; c2 ]=> st'' / res
+  | E_SeqBreak : forall st st' c1 c2,
+      st =[ c1 ]=> st' / SBreak -> 
+      st =[ c1 ;; c2 ]=> st' / SBreak  
+  | E_IfTrue : forall st st' res b ct cf,
+      beval st b = true -> st =[ ct ]=> st' / res ->
+      st =[ TEST b THEN ct ELSE cf FI ]=> st' / res
+  | E_IfFalse : forall st st' res b ct cf,
+      beval st b = false -> st =[ cf ]=> st' / res ->
+      st =[ TEST b THEN ct ELSE cf FI ]=> st' / res
+  | E_WhileFalse b c1 : forall st,
+      beval st b = false -> st =[ WHILE b DO c1 END ]=> st / SContinue
+  | E_WhileTrueBreak b c1 : forall st st',
+      beval st b = true -> st =[ c1 ]=> st' / SBreak ->
+      st =[ WHILE b DO c1 END ]=> st' / SContinue
+  | E_WhileTrueContinue b c1 : forall st st' st'' res,
+      beval st b = true -> st =[ c1 ]=> st' / SContinue ->
+      st' =[ WHILE b DO c1 END ]=> st'' / res ->
+      st =[WHILE b DO c1 END ]=> st'' / res
+  | E_ForInitBreak init b last c : forall st st',
+      st =[ init ]=> st' / SBreak -> 
+      st =[ CFor init b last c ]=> st' / SBreak
+  | E_ForFalse init b last c : forall st st',
+      st =[ init ]=> st' / SContinue ->
+      beval st' b = false ->
+      st =[ CFor init b last c ]=> st' / SContinue
+  | E_ForTrueBreak init b last c : forall st st' st'',
+      st =[ init ]=> st' / SContinue ->
+      beval st' b = true ->
+      st' =[ c ;; last ]=> st'' / SBreak ->
+      st =[ CFor init b last c ]=> st'' / SContinue
+  | E_ForTrueContinue init b last c : forall st st' st'' st''' res,
+      st =[ init ]=> st' / SContinue ->
+      beval st' b = true ->
+      st' =[ c ;; last ]=> st'' / SContinue ->
+      st'' =[ WHILE b DO (c ;; last) END ]=> st''' / res ->
+      st =[ CFor init b last c ]=> st''' / res
+
+
+  where "st '=[' c ']=>' st' '/' s" := (ceval c st s st').
+
+(** **** 练习：4 星, advanced, optional (ceval_deterministic)  *)
+Theorem ceval_deterministic: forall (c:com) st st1 st2 s1 s2,
+     st =[ c ]=> st1 / s1 ->
+     st =[ c ]=> st2 / s2 ->
+     st1 = st2 /\ s1 = s2.
+Proof.
+  intros c st st1 st2 s1 s2 H1. generalize dependent st2. generalize dependent s2.
+  induction H1; intros s2 st2 H2;
+  try (inversion H2; split; reflexivity).
+  - inversion H2. 
+    + subst. destruct (IHceval1 SContinue st'0) as [IH1 IH2]. apply H1. 
+      assert (Eq: st' = st'0). apply IH1. rewrite <- Eq in H6. apply IHceval2.
+      apply H6.
+    + subst. destruct (IHceval1 SBreak st2). apply H5. discriminate H0.
+  - inversion H2.
+    + subst. destruct (IHceval SContinue st'0). apply H3. discriminate H0.
+    + subst. apply IHceval. apply H6.
+  - inversion H2; subst.
+    + apply IHceval. apply H9.
+    + rewrite H in H8. discriminate.
+  - inversion H2; subst.
+    + rewrite H in H8. discriminate.
+    + apply IHceval. apply H9.
+  - inversion H2; subst; 
+    try (split; reflexivity);
+    try (rewrite H in H3; discriminate).
+  - inversion H2; subst;
+    try (split; reflexivity);
+    try (rewrite H in H7; discriminate).
+    + destruct (IHceval SBreak st2) as [H11 H12].
+      apply H8. split. apply H11. reflexivity.
+    + destruct (IHceval SContinue st'0) as [H11 H12].
+      apply H5. discriminate.
+  - inversion H2; subst;
+    try (rewrite H in H6; discriminate).
+    + destruct (IHceval1 SBreak st2). apply H7. discriminate.
+    + destruct (IHceval1 SContinue st'0). apply H4.
+      apply IHceval2. rewrite <- H0 in H8. apply H8.
+  - inversion H2; subst;
+    try (apply IHceval; apply H8);
+    try (destruct (IHceval SContinue st2); apply H8; discriminate).
+    + destruct (IHceval SContinue st'0). apply H8. discriminate.
+    + destruct (IHceval SContinue st'0). apply H5. discriminate.
+  - inversion H2; subst;
+    try (apply IHceval; assumption);
+    try (destruct (IHceval SContinue st2); assumption; discriminate).
+    + destruct (IHceval SContinue st'0). assumption. rewrite H0 in H. 
+      rewrite H in H10. discriminate.
+    + destruct (IHceval SContinue st'0). assumption. rewrite H0 in H. 
+      rewrite H in H10. discriminate.
+  - inversion H2; subst.
+    + destruct (IHceval1 SBreak st2). apply H8. discriminate.
+    + destruct (IHceval1 SContinue st2). apply H8. rewrite H0 in H.
+      rewrite H in H9. discriminate.
+    + destruct (IHceval1 SContinue st'0). apply H8. rewrite <- H0 in H10.
+      destruct (IHceval2 SBreak st2). apply H10. split. apply H3. reflexivity.
+    + destruct (IHceval1 SContinue st'0). apply H5. rewrite <- H0 in H10.
+      destruct (IHceval2 SContinue st''0). apply H10. discriminate.
+  - inversion H2; subst.
+    + destruct (IHceval1 SBreak st2). apply H8. discriminate. 
+    + destruct (IHceval1 SContinue st2). apply H8. rewrite H0 in H.
+      rewrite H in H9. discriminate.
+    + destruct (IHceval1 SContinue st'0). apply H8. rewrite <- H0 in H10. 
+      destruct (IHceval2 SBreak st2). apply H10. discriminate.
+    + destruct (IHceval1 SContinue st'0). apply H5. subst.
+      destruct (IHceval2 SContinue st''0). apply H10. subst. apply IHceval3.
+      apply H11.
+Qed.
+
+(** [] *)
+End ForImp.
 
 (* 2022-03-14 05:26:58 (UTC+00) *)
