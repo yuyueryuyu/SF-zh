@@ -7,7 +7,7 @@
 (* ################################################################# *)
 (** * 一个无法完成的求值器 *)
 
-From Coq Require Import omega.Omega.
+From Coq Require Import Lia.
 From Coq Require Import Arith.Arith.
 From LF Require Import Imp Maps.
 
@@ -189,9 +189,17 @@ Definition test_ceval (st:state) (c:com) :=
     编写一个 Imp 程序对 [1] 到 [X] 求和（即 [1 + 2 + ... + X]）并赋值给 [Y]。
     确保你的解答能满足之后的测试。 *)
 
-Definition pup_to_n : com
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
-
+Definition pup_to_n : com :=
+  ( Y ::= 0;;
+    WHILE 1 <= X DO
+      Y ::= Y + X;;
+      X ::= X - 1
+    END
+    ).
+Example pup_to_n_1 :
+  test_ceval (X !-> 5) pup_to_n
+  = Some (0, 15, 0).
+Proof. reflexivity. Qed.
 (* 
 
 Example pup_to_n_1 :
@@ -209,7 +217,17 @@ Proof. reflexivity. Qed.
 (* 请在此处解答
 
     [] *)
+Definition peven : com :=
+  ( WHILE 2 <= X DO
+      X ::= X - 2
+    END ;;
+    Z ::= X
+    ).
 
+Example peven_1 :
+  test_ceval (X !-> 5) peven
+  = Some (1, 0, 1).
+Proof. reflexivity. Qed.
 (* ################################################################# *)
 (** * 关系求值 vs. 计步求值 *)
 
@@ -278,6 +296,15 @@ Proof.
 
 (* 请在此处解答 *)
 
+(* 
+          证明：
+          将当前剩余step的值应用归纳法：
+          如果已满，则与当前还剩有步数矛盾。
+          若非满，则对于可以停机的情况（如SKIP等），应用归纳法即可，
+          对于不可以停机的情况，则最终会到达None，显然矛盾。
+
+
+*)
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_ceval_step__ceval_inf : option (nat*string) := None.
 (** [] *)
@@ -292,7 +319,7 @@ induction i1 as [|i1']; intros i2 st st' c Hle Hceval.
     simpl in Hceval. discriminate Hceval.
   - (* i1 = S i1' *)
     destruct i2 as [|i2']. inversion Hle.
-    assert (Hle': i1' <= i2') by omega.
+    assert (Hle': i1' <= i2') by lia.
     destruct c.
     + (* SKIP *)
       simpl in Hceval. inversion Hceval.
@@ -336,8 +363,50 @@ Theorem ceval__ceval_step: forall c st st',
       exists i, ceval_step st c i = Some st'.
 Proof.
   intros c st st' Hce.
-  induction Hce.
-  (* 请在此处解答 *) Admitted.
+  induction Hce. 
+  - exists 1. simpl. reflexivity.
+  - exists 1. simpl. rewrite H. reflexivity.
+  - destruct IHHce1. destruct IHHce2.
+    destruct (Nat.leb_spec0 x0 x).
+    + exists (S x). simpl.
+      destruct (ceval_step st c1 x) eqn:En.
+      * injection H as H. rewrite H. 
+        apply (ceval_step_more x0). apply l. apply H0.
+      * discriminate.
+    + apply not_le in n. apply Arith_base.gt_le_S_stt in n. apply le_S in n.
+      apply le_S_n in n.
+      exists (S x0). simpl.
+      destruct (ceval_step st c1 x0) eqn:En.
+      * apply (ceval_step_more x x0) in H. rewrite En in H. 
+        injection H as H. rewrite H. apply H0. apply n. 
+      * apply (ceval_step_more x x0) in H. rewrite En in H. discriminate. apply n.
+  - destruct IHHce. exists (S x). simpl.
+    destruct (beval st b).
+    + apply H0.
+    + discriminate.
+  - destruct IHHce. exists (S x). simpl.
+    destruct (beval st b).
+    + discriminate.
+    + apply H0.
+  - exists 1. simpl. rewrite H. reflexivity.
+  - destruct IHHce1. destruct IHHce2.
+    destruct (Nat.leb_spec0 x0 x).
+    + exists (S x). simpl. rewrite H.
+      destruct (ceval_step st c x).
+      * injection H0 as H0.
+        apply (ceval_step_more x0). apply l. rewrite H0. apply H1.
+      * discriminate.
+    + apply not_le in n. apply Arith_base.gt_le_S_stt in n. apply le_S in n.
+      apply le_S_n in n.
+      exists (S x0). simpl. rewrite H.
+      destruct (ceval_step st c x0) eqn:En.
+      * apply (ceval_step_more x x0) in H0. rewrite En in H0.
+        injection H0 as H0. rewrite H0. apply H1. apply n.
+      * apply (ceval_step_more x x0) in H0. rewrite En in H0. discriminate.
+        apply n.
+Qed. 
+
+    
 (** [] *)
 
 Theorem ceval_and_ceval_step_coincide: forall c st st',
@@ -367,6 +436,6 @@ Proof.
   apply ceval_step_more with (i2 := i1 + i2) in E1.
   apply ceval_step_more with (i2 := i1 + i2) in E2.
   rewrite E1 in E2. inversion E2. reflexivity.
-  omega. omega.  Qed.
+  lia. lia.  Qed.
 
 (* 2022-03-14 05:26:58 (UTC+00) *)

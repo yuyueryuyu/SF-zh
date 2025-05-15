@@ -12,12 +12,12 @@
     但是大部分的读者大概只会粗略看一眼，然后跳到末尾的“例子”一节。 *)
 
 Set Warnings "-notation-overridden,-parsing".
-From Coq Require Import Strings.String.
-From Coq Require Import Strings.Ascii.
-From Coq Require Import Arith.Arith.
-From Coq Require Import Init.Nat.
-From Coq Require Import Arith.EqNat.
-From Coq Require Import Lists.List.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Strings.Ascii.
+From Stdlib Require Import Arith.Arith.
+From Stdlib Require Import Init.Nat.
+From Stdlib Require Import Arith.EqNat.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 From LF Require Import Maps Imp.
 

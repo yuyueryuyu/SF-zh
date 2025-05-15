@@ -1,7 +1,7 @@
 (** * AltAuto: More Automation *)
 
 Set Warnings "-notation-overridden,-parsing".
-From Coq Require Import omega.Omega.
+From Stdlib Require Import Lia.
 From LF Require Import IndProp.
 
 (** Up to now, we've used the more manual part of Coq's tactic
@@ -435,7 +435,28 @@ Qed.
 Lemma re_opt_match' : forall T (re: reg_exp T) s,
     s =~ re -> s =~ re_opt re.
 Proof.
-(* 请在此处解答 *) Admitted.
+intros T re s M.
+  induction M
+    as [| x'
+        | s1 re1 s2 re2 Hmatch1 IH1 Hmatch2 IH2
+        | s1 re1 re2 Hmatch IH | re1 s2 re2 Hmatch IH
+        | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2];
+  try constructor.
+  - simpl. destruct re1; 
+    try (inversion IH1; simpl; destruct re2; apply IH2);
+    try (destruct re2; 
+      try (inversion IH2; rewrite app_nil_r; apply IH1);
+      try (constructor; assumption)).
+  - simpl. destruct re1; try (inversion IH; fail);
+    try (destruct re2; try constructor; try assumption).
+  - simpl; destruct re1; 
+    try assumption;
+    try destruct re2; try apply MUnionR; try apply IH; inversion IH.
+  - simpl; destruct re; try constructor.
+  - simpl; destruct re; try constructor; try assumption;
+    try (inversion IH1; inversion IH2; constructor).
+Qed.
+
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_re_opt : option (nat*string) := None.
 (** [] *)
@@ -528,7 +549,7 @@ Example silly_presburger_example : forall m n o p,
   m + n <= n + o /\ o + 3 = p + 3 ->
   m <= p.
 Proof.
-  intros. omega.
+  intros. lia.
 Qed.
 
 (* ################################################################# *)
@@ -654,7 +675,7 @@ Qed.
     application of [auto] by writing "[auto using ...]". *)
 
 Lemma le_antisym : forall n m: nat, (n <= m /\ m <= n) -> n = m.
-Proof. intros. omega. Qed.
+Proof. intros. lia. Qed.
 
 Example auto_example_6 : forall n m p : nat,
   (n <= p -> (n <= m /\ m <= n)) ->
@@ -692,7 +713,7 @@ Qed.
     be activated only when needed.  See the Coq reference manual for
     more. *)
 
-Hint Resolve le_antisym.
+Hint Resolve le_antisym : core.
 
 Example auto_example_6' : forall n m p : nat,
   (n<= p -> (n <= m /\ m <= n)) ->
@@ -711,7 +732,7 @@ Proof.
   auto.  (* does nothing *)
 Abort.
 
-Hint Unfold is_fortytwo.
+Hint Unfold is_fortytwo : core.
 
 Example auto_example_7' : forall x,
   (x <= 42 /\ 42 <= x) -> is_fortytwo x.
@@ -732,7 +753,68 @@ Lemma weak_pumping : forall T (re : reg_exp T) s,
     s2 <> [] /\
     forall m, s1 ++ napp m s2 ++ s3 =~ re.
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros T re s Hmatch.
+  induction Hmatch
+    as [ | x | s1 re1 s2 re2 Hmatch1 IH1 Hmatch2 IH2
+       | s1 re1 re2 Hmatch IH | re1 s2 re2 Hmatch IH
+       | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ];
+  try (simpl; lia).
+  - simpl. intros H1. rewrite app_length in H1. 
+    apply add_le_cases in H1. destruct H1 as [H11 | H12].
+    + destruct IH1 as [s1' [s2' [s3' [IH11 [IH12 IH13]]]]]. 
+      apply H11. exists s1'. exists s2'. exists (s3'++s2). 
+      split.
+      * rewrite IH11. repeat rewrite app_assoc. reflexivity.
+      * split. apply IH12.
+        { 
+          intros m. repeat rewrite app_assoc.
+          apply MApp. 
+          { rewrite <- app_assoc. auto. }
+          { auto. }
+        }
+    + destruct IH2 as [s1' [s2' [s3' [IH11 [IH12 IH13]]]]]. 
+      apply H12. exists (s1++s1'). exists s2'. exists s3'.
+      split.
+      * rewrite IH11. 
+        repeat rewrite app_assoc.
+        reflexivity.
+      * split. apply IH12.
+        intros m. rewrite <- app_assoc. auto using MApp.
+  - simpl. intros H1. apply plus_le in H1. destruct H1 as [H11 H12].
+    destruct IH as [s2' [s3' [s4' [IH11 [IH12 IH13]]]]].
+    apply H11. exists s2'. exists s3'. exists s4'.
+    auto using MUnionL.
+  - simpl. intros H1. apply plus_le in H1. destruct H1 as [H11 H12].
+    destruct IH as [s2' [s3' [s4' [IH11 [IH12 IH13]]]]].
+    apply H12. exists s2'. exists s3'. exists s4'.
+    auto using MUnionR.
+  - simpl. intros contra. 
+    inversion contra.
+    apply pumping_constant_0_false in H0. destruct H0.
+  - remember (Star re) as re'. induction Hmatch2;
+    try (inversion Heqre'; fail). 
+    + injection Heqre' as Heqre''. intros H. 
+      rewrite app_nil_r in *. 
+      simpl in H. destruct IH1 as [s2' [s3' [s4' [IH11 [IH12 IH13]]]]]. 
+      rewrite Heqre'' in *. apply H. 
+      exists s2'. exists s3'. exists s4'.
+      split. auto. split. auto.
+      intros m. apply MStar1. rewrite Heqre''.
+      apply IH13.
+    + injection Heqre' as Heqre''. rewrite Heqre'' in *. 
+      intros H.
+      destruct s0 as [| h t] eqn:Hs0.
+      * simpl. destruct IHHmatch2_2 as [s1' [s2' [s3' [IH11 [IH12 IH13]]]]].
+        reflexivity. simpl in IH2. apply IH2.
+        simpl in H. apply H.
+        exists s1'. exists s2'. exists s3'.
+        auto.
+      * exists s1. exists (h::t). exists s2.
+        split. reflexivity. split.
+        unfold not. intros contra. discriminate contra.
+        intros m. apply MStarApp.
+        apply Hmatch1. apply napp_star; auto.
+Qed.
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_pumping_redux : option (nat*string) := None.
 (** [] *)
@@ -743,6 +825,7 @@ Definition manual_grade_for_pumping_redux : option (nat*string) := None.
     shorten your proof (or the "official" solution proof) of the stronger
     Pumping Lemma exercise from [IndProp]. *)
 Import Pumping.
+Hint Resolve pumping : core.
 Lemma pumping : forall T (re : reg_exp T) s,
   s =~ re ->
   pumping_constant re <= length s ->
@@ -752,7 +835,7 @@ Lemma pumping : forall T (re : reg_exp T) s,
     length s1 + length s2 <= pumping_constant re /\
     forall m, s1 ++ napp m s2 ++ s3 =~ re.
 Proof.
-(* 请在此处解答 *) Admitted.
+auto. Qed.
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_pumping_redux_strong : option (nat*string) := None.
 (** [] *)

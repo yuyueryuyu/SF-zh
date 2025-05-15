@@ -16,7 +16,10 @@ I am currently working on Vol 1: LF.
 | IndProp | √ |
 | Maps | √ |
 | Imp | √ |
+| ImpParser | √ |
+| ImpCEvalFun | √ |
 | Auto | √ |
+| AltAuto | √ |
 | ... | X |
 
 
