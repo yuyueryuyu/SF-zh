@@ -23,7 +23,7 @@ From Coq Require Import Bool.Bool.
 From Coq Require Import Init.Nat.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Arith.EqNat.
-From Coq Require Import omega.Omega.
+From Coq Require Import Lia.
 From Coq Require Import Lists.List.
 From Coq Require Import Strings.String.
 Import ListNotations.
@@ -424,10 +424,10 @@ Tactic Notation "simpl_and_try" tactic(c) :=
     “[simpl_and_try reflexivity.]”和写“[simpl; try reflexivity.]”是一样的。 *)
 
 (* ================================================================= *)
-(** ** [omega] 策略 *)
+(** ** [lia] 策略 *)
 
-(** [omega] 实现了一种决策过程，它是名为_'Presburger 算术'_的一阶逻辑的一个子集。
-    它基于启发自 William Pugh [Pugh 1991] (in Bib.v) 的 Omega 算法。
+(** [lia] 实现了一种决策过程，它是名为_'Presburger 算术'_的一阶逻辑的一个子集。
+    它基于启发自 William Pugh [Pugh 1991] (in Bib.v) 的 lia 算法。
 
     如果证明目标是由以下元素构成的式子：
 
@@ -438,17 +438,17 @@ Tactic Notation "simpl_and_try" tactic(c) :=
 
       - 逻辑连结 [/\]、[\/]、[~] 和 [->]
 
-    那么调用 [omega] 要么会解决该证明目标，要么就会失败，这意味着该目标为假
+    那么调用 [lia] 要么会解决该证明目标，要么就会失败，这意味着该目标为假
     （目标_'不满足'_此形式也会失败。） *)
 
 Example silly_presburger_example : forall m n o p,
   m + n <= n + o /\ o + 3 = p + 3 ->
   m <= p.
 Proof.
-  intros. omega.
+  intros. lia.
 Qed.
 
-(** （注意本文件顶部 [From Coq Require Import omega.Omega.]。）*)
+(** （注意本文件顶部 [From Coq Require Import lia.lia.]。）*)
 
 (* ================================================================= *)
 (** ** 更多方便的策略 *)

@@ -2,16 +2,17 @@
 
 Set Warnings "-notation-overridden,-parsing".
 From PLF Require Import Maps.
-From Coq Require Import Bool.Bool.
-From Coq Require Import Arith.Arith.
-From Coq Require Import Init.Nat.
-From Coq Require Import Arith.PeanoNat. Import Nat.
-From Coq Require Import Arith.EqNat.
-From Coq Require Import omega.Omega.
-From Coq Require Import Lists.List.
-From Coq Require Import Logic.FunctionalExtensionality.
+From Stdlib Require Import Bool.Bool.
+From Stdlib Require Import Arith.Arith.
+From Stdlib Require Import Init.Nat.
+From Stdlib Require Import Arith.PeanoNat. Import Nat.
+From Stdlib Require Import Arith.EqNat.
+From Stdlib Require Import Lia.
+From Stdlib Require Import Lists.List.
+From Stdlib Require Import Logic.FunctionalExtensionality.
 Import ListNotations.
 From PLF Require Import Imp.
+Set Default Goal Selector "!".
 
 (** *** 一些关于习题的建议：
 
@@ -59,7 +60,7 @@ Definition bequiv (b1 b2 : bexp) : Prop :=
 
 Theorem aequiv_example: aequiv (X - X) 0.
 Proof.
-  intros st. simpl. omega.
+  intros st. simpl. lia.
 Qed.
 
 Theorem bequiv_example: bequiv (X - X = 0) true.
@@ -98,8 +99,8 @@ Proof.
     assumption.
   - (* <- *)
     apply E_Seq with st.
-    apply E_Skip.
-    assumption.
+    + apply E_Skip.
+    + assumption.
 Qed.
 
 (** **** 练习：2 星, standard (skip_right) 
@@ -111,7 +112,13 @@ Theorem skip_right : forall c,
     (c ;; SKIP)
     c.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros c st st'. split; intros H.
+  - inversion H. subst. inversion H5. subst.
+    apply H2.
+  - apply E_Seq with st'. 
+    + apply H.
+    + apply E_Skip.
+Qed.
 (** [] *)
 
 (** 同样，下面是一个优化 [TEST] 的简单程序变换： *)
@@ -124,9 +131,13 @@ Proof.
   intros c1 c2.
   split; intros H.
   - (* -> *)
-    inversion H; subst. assumption. inversion H5.
+    inversion H; subst. 
+    + assumption. 
+    + inversion H5.
   - (* <- *)
-    apply E_IfTrue. reflexivity. assumption.  Qed.
+    apply E_IfTrue. 
+    + reflexivity. 
+    + assumption.  Qed.
 
 (** 当然，人类程序员是不会写把断言（guard）直接写成 [true] 的条件分支的。
     不过当断言_'等价于真'_的情况时就会写出来：
@@ -189,7 +200,15 @@ Theorem TEST_false : forall b c1 c2,
     (TEST b THEN c1 ELSE c2 FI)
     c2.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros b c1 c2 Hb.
+  split; intros H.
+  - inversion H; subst.
+    + unfold bequiv in Hb. simpl in Hb. rewrite Hb in H5. discriminate.
+    + assumption.
+  - apply E_IfFalse. 
+    + unfold bequiv in Hb. simpl in Hb. apply Hb.
+    + apply H. 
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard (swap_if_branches) 
@@ -201,7 +220,22 @@ Theorem swap_if_branches : forall b e1 e2,
     (TEST b THEN e1 ELSE e2 FI)
     (TEST BNot b THEN e2 ELSE e1 FI).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros b e1 e2. split; intros H.
+  - inversion H; subst.
+    + apply E_IfFalse; simpl.
+      * rewrite H5. reflexivity.
+      * assumption.
+    + apply E_IfTrue; simpl.
+      * rewrite H5. reflexivity.
+      * assumption.
+  - inversion H; subst.
+    + apply E_IfFalse.
+      * simpl in H5. apply negb_true_iff in H5. apply H5.
+      * assumption.
+    + apply E_IfTrue.
+      * simpl in H5. apply negb_false_iff in H5. apply H5.
+      * assumption.
+Qed.
 (** [] *)
 
 (** 对于 [WHILE] 循环，我们能够给出一组相似的定理：当循环的断言等价于 [BFalse]
@@ -232,6 +266,12 @@ Proof.
     写出 [WHILE_false] 的非形式化证明。
 
 (* 请在此处解答 *)
+证明： 1. 对于 ->： 假设 证明自 [E_WhileFalse]
+         这条证明规则。若使用证明规则 [E_WhileFalse] 其必备的前提条件 [st =[ c1 ]=> st]
+         必为真，而这正好是我们的证明所需要的条件。
+          假设证明自[E_WhileTrue]，则假设bequiv b BFalse不成立，矛盾
+      2. 对于 <-： 我们要证明若st =[ SKIP ]=> st'，则st =[ WHILE ...]=> st'，我们可以
+      应用E_WHILEFALSE，可以推出st=st'，因此命题可以得证。  
 *)
 (** [] *)
 
@@ -312,16 +352,16 @@ Proof.
   - (* -> *)
     inversion Hce; subst.
     + (* 不执行循环 *)
-      apply E_IfFalse. assumption. apply E_Skip.
+      apply E_IfFalse; try assumption; apply E_Skip.
     + (* 执行循环 *)
-      apply E_IfTrue. assumption.
-      apply E_Seq with (st' := st'0). assumption. assumption.
+      apply E_IfTrue; try assumption.
+      apply E_Seq with (st' := st'0); assumption.
   - (* <- *)
     inversion Hce; subst.
     + (* 执行循环 *)
       inversion H5; subst.
-      apply E_WhileTrue with (st' := st'0).
-      assumption. assumption. assumption.
+      apply E_WhileTrue with (st' := st'0);
+      assumption. 
     + (* 不执行循环 *)
       inversion H5; subst. apply E_WhileFalse. assumption.  Qed.
 
@@ -329,7 +369,15 @@ Proof.
 Theorem seq_assoc : forall c1 c2 c3,
   cequiv ((c1;;c2);;c3) (c1;;(c2;;c3)).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros c1 c2 c3. split; intros H.
+  - inversion H; subst. inversion H2; subst.
+    apply E_Seq with st'1; try assumption.
+    apply E_Seq with st'0; try assumption.
+  - inversion H; subst. inversion H5; subst.
+    apply E_Seq with st'1.
+    + apply E_Seq with st'0; try assumption.
+    + assumption.
+Qed. 
 (** [] *)
 
 (** 证明涉及赋值的程序的属性经常会用到这一事实，即程序状态会根据其外延性
@@ -357,7 +405,15 @@ Theorem assign_aequiv : forall (x : string) e,
   aequiv x e ->
   cequiv SKIP (x ::= e).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros x e H. split; intros He.
+  - rewrite <- (t_update_same nat st' x).
+    inversion He;subst.
+    unfold aequiv in H; simpl in H.
+    apply E_Ass. symmetry. apply H.
+  - inversion He; subst. unfold aequiv in H; simpl in H.
+    rewrite <- H. rewrite t_update_same. apply E_Skip.
+Qed.
+    
 (** [] *)
 
 (** **** 练习：2 星, standard (equiv_classes)  *)
@@ -418,8 +474,26 @@ Definition prog_i : com :=
     X ::= Y + 1
   END)%imp.
 
-Definition equiv_classes : list (list com)
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition equiv_classes : list (list com) :=
+  [
+    [prog_a;prog_d];
+    [prog_c;prog_h];
+    [prog_b;prog_e];
+    [prog_f;prog_g];
+    [prog_i]
+  ].
+
+(*
+  prog_a: X = 0 -> SKIP ; X != 0 -> 死循环
+  prog_b: Y = 0
+  prog_c: SKIP
+  prog_d : X = 0 -> SKIP ; X != 0 -> 死循环
+  prog_e: Y = 0
+  prog_f/prog_g: 死循环
+  prog_h: SKIP
+  prog_i: X = Y -> SKIP ; X != Y -> 死循环
+
+*)
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_equiv_classes : option (nat*string) := None.
@@ -486,14 +560,16 @@ Proof.
   intros P1 P2 P3 H12 H23.
   inversion H12. inversion H23.
   split; intros A.
-    apply H1. apply H. apply A.
-    apply H0. apply H2. apply A.  Qed.
+  -  apply H1. apply H. apply A.
+  -  apply H0. apply H2. apply A.  Qed.
 
 Lemma trans_cequiv : forall (c1 c2 c3 : com),
   cequiv c1 c2 -> cequiv c2 c3 -> cequiv c1 c3.
 Proof.
   unfold cequiv. intros c1 c2 c3 H12 H23 st st'.
-  apply iff_trans with (st =[ c2 ]=> st'). apply H12. apply H23.  Qed.
+  apply iff_trans with (st =[ c2 ]=> st').
+  - apply H12.
+  - apply H23.  Qed.
 
 (* ================================================================= *)
 (** ** 行为等价是一种一致性 *)
@@ -604,7 +680,15 @@ Theorem CSeq_congruence : forall c1 c1' c2 c2',
   cequiv c1 c1' -> cequiv c2 c2' ->
   cequiv (c1;;c2) (c1';;c2').
 Proof.
-  (* 请在此处解答 *) Admitted.
+  unfold cequiv. intros c1 c1' c2 c2' H1 H2.
+  intros st st'. split; intros Hst.
+  - inversion Hst; subst. apply E_Seq with st'0.
+    + apply H1. apply H3.
+    + apply H2. apply H6.
+  - inversion Hst; subst. apply E_Seq with st'0.
+    + apply H1. apply H3.
+    + apply H2. apply H6.
+Qed.   
 (** [] *)
 
 (** **** 练习：3 星, standard (CIf_congruence)  *)
@@ -613,7 +697,23 @@ Theorem CIf_congruence : forall b b' c1 c1' c2 c2',
   cequiv (TEST b THEN c1 ELSE c2 FI)
          (TEST b' THEN c1' ELSE c2' FI).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros b b' c1 c1' c2 c2' H1 H2 H3. intros st st'.
+  split; intros.
+  - inversion H; subst. 
+    + apply E_IfTrue. 
+      * rewrite <- H1. apply H8.
+      * apply H2. apply H9.
+    + apply E_IfFalse.
+      * rewrite <- H1. apply H8.
+      * apply H3. apply H9.
+  - inversion H; subst.
+    + apply E_IfTrue. 
+      * rewrite H1. apply H8.
+      * apply H2. apply H9.
+    + apply E_IfFalse.
+      * rewrite H1. apply H8.
+      * apply H3. apply H9.
+Qed.
 (** [] *)
 
 (** 例如，下面是两个等价的程序和它们等价关系的证明... *)
@@ -642,9 +742,10 @@ Proof.
   - apply CIf_congruence.
     + apply refl_bequiv.
     + apply CAss_congruence. unfold aequiv. simpl.
-      * symmetry. apply minus_diag.
+      * symmetry. apply sub_diag.
     + apply refl_cequiv.
 Qed.
+
 
 (** **** 练习：3 星, advanced, optional (not_congr) 
 
@@ -652,8 +753,8 @@ Qed.
     你能想出一个对于指令满足等价关系但_'不满足'_一致性的关系吗？ *)
 
 (* 请在此处解答
-
     [] *)
+
 
 (* ################################################################# *)
 (** * 程序变换 *)
@@ -957,7 +1058,15 @@ Proof.
     (* 唯一有趣的是 a1 和 a2 在折叠后同时变为常量 *)
       simpl. destruct (n =? n0); reflexivity.
   - (* BLe *)
-    (* 请在此处解答 *) admit.
+    simpl. 
+    remember (fold_constants_aexp a1) as a1' eqn:Heqa1'.
+    remember (fold_constants_aexp a2) as a2' eqn:Heqa2'.
+    replace (aeval st a1) with (aeval st a1') by
+      (subst a1'; rewrite <- fold_constants_aexp_sound; reflexivity).
+    replace (aeval st a2) with (aeval st a2') by
+      (subst a2'; rewrite <- fold_constants_aexp_sound; reflexivity).
+    destruct a1'; destruct a2'; try reflexivity.
+    simpl. destruct (n <=? n0); reflexivity.
   - (* BNot *)
     simpl. remember (fold_constants_bexp b) as b' eqn:Heqb'.
     rewrite IHb.
@@ -968,7 +1077,7 @@ Proof.
     remember (fold_constants_bexp b2) as b2' eqn:Heqb2'.
     rewrite IHb1. rewrite IHb2.
     destruct b1'; destruct b2'; reflexivity.
-(* 请在此处解答 *) Admitted.
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard (fold_constants_com_sound) 
@@ -998,7 +1107,9 @@ Proof.
       apply trans_cequiv with c2; try assumption.
       apply TEST_false; assumption.
   - (* WHILE *)
-    (* 请在此处解答 *) Admitted.
+    destruct (fold_constants_bexp b) eqn:Heqb;
+      try (apply CWhile_congruence; assumption).
++ Abort. 
 (** [] *)
 
 (* ----------------------------------------------------------------- *)

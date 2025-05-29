@@ -4,11 +4,11 @@ My personal study record for _Software Foundations_.
 Please do not treat this as an exercise solution. 
 
 
-I am currently working on Vol 1: LF.
-| 章节 | 进度 |
-| --- | --- |
-| Basics | √ |
-| Induction | √ |
+I am currently working on Vol 2: PLF.
+| LF 章节 | 进度 | PLF 章节 | 进度 |
+| --- | --- | --- | --- |
+| Basics | √ | Equiv | 50%~ |
+| Induction | √ | ... | × |
 | Lists | √ |
 | Poly | √ |
 | Tactics | √ |
@@ -20,7 +20,7 @@ I am currently working on Vol 1: LF.
 | ImpCEvalFun | √ |
 | Auto | √ |
 | AltAuto | √ |
-| ... | X |
+| --- | --- |
 
 
 ***
