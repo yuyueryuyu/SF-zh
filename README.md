@@ -20,7 +20,6 @@ I am currently working on Vol 2: PLF.
 | ImpCEvalFun | √ |
 | Auto | √ |
 | AltAuto | √ |
-| --- | --- |
 
 
 ***
