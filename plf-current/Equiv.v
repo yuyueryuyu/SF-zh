@@ -1107,9 +1107,15 @@ Proof.
       apply trans_cequiv with c2; try assumption.
       apply TEST_false; assumption.
   - (* WHILE *)
+    assert (bequiv b (fold_constants_bexp b)). {
+      apply fold_constants_bexp_sound. }
     destruct (fold_constants_bexp b) eqn:Heqb;
-      try (apply CWhile_congruence; assumption).
-+ Abort. 
+    try( apply (WHILE_true b c); apply H);
+    try( apply (WHILE_false b c); apply H);
+    try( apply CWhile_congruence; assumption).
+Qed.
+       
+
 (** [] *)
 
 (* ----------------------------------------------------------------- *)
@@ -1154,6 +1160,126 @@ Proof.
 (* 请在此处解答
 
     [] *)
+Fixpoint optimize_0plus_aexp (e:aexp) : aexp :=
+  match e with
+  | ANum n =>
+      ANum n
+  | AId x => AId x
+  | APlus (ANum 0) e2 =>
+      optimize_0plus_aexp e2
+  | APlus e1 e2 =>
+      APlus (optimize_0plus_aexp e1) (optimize_0plus_aexp e2)
+  | AMinus e1 e2 =>
+      AMinus (optimize_0plus_aexp e1) (optimize_0plus_aexp e2)
+  | AMult e1 e2 =>
+      AMult (optimize_0plus_aexp e1) (optimize_0plus_aexp e2)
+  end.
+
+Theorem optimize_0plus_aexp_sound : 
+  atrans_sound optimize_0plus_aexp.
+Proof.
+  unfold atrans_sound. intros a. induction a; simpl; try apply refl_aequiv;
+  try (unfold aequiv in *; simpl in *; intros; rewrite IHa1; rewrite IHa2; reflexivity).
+  - unfold aequiv in *. destruct a1;
+    try (simpl in *; intros; try rewrite IHa1; try rewrite IHa2; reflexivity).
+    + destruct n.
+      * simpl. assumption.
+      * simpl in *. intros. rewrite IHa2. reflexivity.
+Qed.
+
+Fixpoint optimize_0plus_bexp (b : bexp) : bexp :=
+  match b with
+  | BTrue        => BTrue
+  | BFalse       => BFalse
+  | BEq a1 a2  => BEq (optimize_0plus_aexp a1) (optimize_0plus_aexp a2)
+  | BLe a1 a2  => BLe (optimize_0plus_aexp a1) (optimize_0plus_aexp a2)
+  | BNot b1  => BNot (optimize_0plus_bexp b1)
+  | BAnd b1 b2  => BAnd (optimize_0plus_bexp b1) (optimize_0plus_bexp b2)
+  end.
+
+Theorem optimize_0plus_bexp_sound : 
+  btrans_sound optimize_0plus_bexp.
+Proof.
+  unfold btrans_sound. intros b. induction b; simpl; try apply refl_bequiv;
+  try (unfold bequiv; intros; simpl; 
+    repeat rewrite <- optimize_0plus_aexp_sound; reflexivity).
+  - unfold bequiv; intros. simpl. rewrite IHb. reflexivity.
+  - unfold bequiv; intros. simpl. rewrite IHb1. rewrite IHb2. reflexivity.
+Qed. 
+
+Open Scope imp.
+Fixpoint optimize_0plus_com (c : com) : com :=
+  match c with
+  | SKIP      =>
+      SKIP
+  | x ::= a   =>
+      x ::= (optimize_0plus_aexp a)
+  | c1 ;; c2  =>
+      (optimize_0plus_com c1) ;; (optimize_0plus_com c2)
+  | TEST b THEN c1 ELSE c2 FI =>
+      TEST (optimize_0plus_bexp b) THEN 
+        (optimize_0plus_com c1)
+      ELSE (optimize_0plus_com c2)  FI
+  | WHILE b DO c END =>
+      WHILE (optimize_0plus_bexp b) DO (optimize_0plus_com c) END
+  end.
+
+Theorem optimize_0plus_com_sound :
+  ctrans_sound optimize_0plus_com.
+Proof.
+  intros c. unfold cequiv. induction c.
+    + simpl. intros st st'. split; intros H; assumption. 
+    + assert (aequiv a (optimize_0plus_aexp a)).
+      { apply optimize_0plus_aexp_sound. }
+      simpl. apply (CAss_congruence x a (optimize_0plus_aexp a)); assumption.
+    + simpl. apply (CSeq_congruence c1 (optimize_0plus_com c1) c2 (optimize_0plus_com c2)); assumption.
+    + assert (bequiv b (optimize_0plus_bexp b)).
+      { apply optimize_0plus_bexp_sound. }
+      simpl. apply (CIf_congruence b (optimize_0plus_bexp b) c1 (optimize_0plus_com c1) c2 (optimize_0plus_com c2)); assumption.
+    +assert (bequiv b (optimize_0plus_bexp b)).
+      { apply optimize_0plus_bexp_sound. }
+      simpl. apply (CWhile_congruence b (optimize_0plus_bexp b) c (optimize_0plus_com c)); assumption.
+Qed.
+
+Definition fold_constants_0plus (c : com) : com :=
+  optimize_0plus_com (fold_constants_com c).
+
+Example fold_constants_0plus_example : 
+   fold_constants_0plus
+    (* 原程序： *)
+    (X ::= 4 + 5;;
+     Y ::= 0 + X - 3;;
+     TEST (0 + X + Y) = (2 + 4) THEN SKIP
+     ELSE Y ::= 0 FI;;
+     TEST 0 <= (4 - (2 + 1)) THEN Y ::= 0
+     ELSE SKIP FI;;
+     WHILE Y = 0 DO
+       X ::= 0 + X + 1
+     END)%imp
+  = (* 常量折叠后： *)
+    (X ::= 9;;
+     Y ::= X - 3;;
+     TEST (X + Y) = 6 THEN SKIP
+     ELSE Y ::= 0 FI;;
+     Y ::= 0;;
+     WHILE Y = 0 DO
+       X ::= X + 1
+     END)%imp.
+Proof. reflexivity. Qed.
+
+Theorem fold_constants_0plus_sound : 
+  ctrans_sound fold_constants_0plus.
+Proof.
+  intros c. intros st st'. unfold fold_constants_0plus.
+  split; intros H'.
+  - apply (optimize_0plus_com_sound (fold_constants_com c)).
+    apply (fold_constants_com_sound c). apply H'.
+  - apply (optimize_0plus_com_sound) in H'.
+    apply (fold_constants_com_sound) in H'. apply H'.
+Qed.
+
+      
+
 
 (* ################################################################# *)
 (** * 证明程序不等价 *)
@@ -1172,7 +1298,8 @@ Proof.
 
 (** 我们马上就会发现这是不行的。不过且慢，现在，
     看你自己能否找出一个反例来。 *)
-
+(* X ::= X + 1 ;; Y ::= X
+   X ::= X + 1 ;; Y ::= X + 1 *)
 (** 以下形式化的定义描述了如何在算术表达式 [a] 中，
     将某个变量 [x] 的所有引用都替换成另一个表达式 [u] ： *)
 
@@ -1302,13 +1429,91 @@ Lemma aeval_weakening : forall x st a ni,
   var_not_used_in_aexp x a ->
   aeval (x !-> ni ; st) a = aeval st a.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros x st a ni H. induction a; simpl; try reflexivity;
+  try (inversion H; subst; apply t_update_neq; assumption);
+  try (inversion H; rewrite IHa1; 
+    try (rewrite IHa2; try reflexivity; assumption); assumption).
+Qed.
+       
 
 (** 使用 [var_not_used_in_aexp]，形式化并证明正确版本的 [subst_equiv_property]。 *)
 
 (* 请在此处解答
 
     [] *)
+Lemma aeval_eq_ass : forall st st' x a1 a2,
+  aeval st a1 = aeval st a2 -> 
+  (st =[x ::= a1]=> st' <-> st=[x ::= a2]=> st').
+Proof.
+  intros st st' x a1 a2 H. split; intros.
+  - inversion H0; subst. rewrite H. constructor. reflexivity.
+  - inversion H0; subst. rewrite <- H. constructor. reflexivity.
+Qed.
+
+Theorem aeval_subst_eq : forall st x a1 a2,
+var_not_used_in_aexp x a1 -> aeval (x !-> aeval st a1; st) (subst_aexp x a1 a2) = aeval (x !-> aeval st a1; st) a2.
+Proof.
+  intros st x a1 a2 H. induction a2; simpl; try reflexivity.
+  - destruct (eqb_string x x0) eqn:Es.
+    + apply eqb_string_true_iff in Es. rewrite <- Es.
+      rewrite t_update_eq. apply aeval_weakening; assumption.
+    + simpl. reflexivity.
+  - simpl. rewrite IHa2_1. rewrite IHa2_2. reflexivity.
+  - simpl. rewrite IHa2_1. rewrite IHa2_2. reflexivity.
+  - simpl. rewrite IHa2_1. rewrite IHa2_2. reflexivity.
+Qed.
+
+Theorem subst_equiv_property' : forall x1 x2 a1 a2,
+  var_not_used_in_aexp x1 a1 -> cequiv (x1 ::= a1;; x2 ::= a2)
+         (x1 ::= a1;; x2 ::= subst_aexp x1 a1 a2).
+
+Proof.
+  intros x1 x2 a1 a2 H. induction a2; simpl; try (apply refl_cequiv).
+  - destruct (eqb_string x1 x) eqn:Es.
+    + apply eqb_string_true_iff in Es. rewrite <- Es.
+      unfold cequiv. intros st st'.
+      split; intros H'.
+      * inversion H'; subst. apply E_Seq with st'0; try assumption.
+        inversion H2; subst. apply aeval_eq_ass with (a2:=x).
+        ** simpl. rewrite t_update_eq. apply aeval_weakening; assumption.
+        ** assumption.
+      * inversion H'; subst. apply E_Seq with st'0; try assumption.
+        inversion H2; subst. apply aeval_eq_ass with (a2:=a1). 
+        ** simpl. rewrite t_update_eq. symmetry. apply aeval_weakening; assumption.
+        ** assumption.
+    + apply refl_cequiv.
+  - split; intros.
+    + inversion H0; subst. apply E_Seq with st'0; try assumption.
+      inversion H3; subst. apply aeval_eq_ass with (a2:=(a2_1+a2_2)).
+      * simpl. repeat rewrite aeval_subst_eq; try reflexivity; try assumption.
+      * assumption.
+    + inversion H0; subst. apply E_Seq with st'0; try assumption.
+      inversion H3; subst. apply aeval_eq_ass with (a2:=((subst_aexp x1 a1 a2_1)+(subst_aexp x1 a1 a2_2))).
+      * simpl. repeat rewrite aeval_subst_eq; try reflexivity; try assumption.
+      * assumption.
+  - split; intros.
+    + inversion H0; subst. apply E_Seq with st'0; try assumption.
+      inversion H3; subst. apply aeval_eq_ass with (a2:=(a2_1-a2_2)).
+      * simpl. repeat rewrite aeval_subst_eq; try reflexivity; try assumption.
+      * assumption.
+    + inversion H0; subst. apply E_Seq with st'0; try assumption.
+      inversion H3; subst. apply aeval_eq_ass with (a2:=((subst_aexp x1 a1 a2_1)-(subst_aexp x1 a1 a2_2))).
+      * simpl. repeat rewrite aeval_subst_eq; try reflexivity; try assumption.
+      * assumption.
+  - split; intros.
+    + inversion H0; subst. apply E_Seq with st'0; try assumption.
+      inversion H3; subst. apply aeval_eq_ass with (a2:=(a2_1*a2_2)).
+      * simpl. repeat rewrite aeval_subst_eq; try reflexivity; try assumption.
+      * assumption.
+    + inversion H0; subst. apply E_Seq with st'0; try assumption.
+      inversion H3; subst. apply aeval_eq_ass with (a2:=((subst_aexp x1 a1 a2_1)*(subst_aexp x1 a1 a2_2))).
+      * simpl. repeat rewrite aeval_subst_eq; try reflexivity; try assumption.
+      * assumption. 
+Qed.
+                 
+        
+
+
 
 (** **** 练习：3 星, standard (inequiv_exercise) 
 
@@ -1317,7 +1522,10 @@ Proof.
 Theorem inequiv_exercise:
   ~ cequiv (WHILE true DO SKIP END) SKIP.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  unfold not. intros contra. unfold cequiv in contra.
+  destruct (contra empty_st empty_st).
+  apply WHILE_true_nonterm in H0; try assumption; try (simpl; apply refl_bequiv); constructor.
+Qed. 
 (** [] *)
 
 (* ################################################################# *)
@@ -1413,7 +1621,8 @@ Inductive ceval : com -> state -> state -> Prop :=
       st  =[ c ]=> st' ->
       st' =[ WHILE b DO c END ]=> st'' ->
       st  =[ WHILE b DO c END ]=> st''
-(* 请在此处解答 *)
+  | E_Havoc : forall st x n,
+      st =[ HAVOC x ]=> (x !-> n ; st)
 
   where "st =[ c ]=> st'" := (ceval c st st').
 Close Scope imp_scope.
@@ -1422,12 +1631,16 @@ Close Scope imp_scope.
 
 Example havoc_example1 : empty_st =[ (HAVOC X)%imp ]=> (X !-> 0).
 Proof.
-(* 请在此处解答 *) Admitted.
+  simpl. apply E_Havoc with (n:=0).
+Qed.
 
 Example havoc_example2 :
   empty_st =[ (SKIP;; HAVOC Z)%imp ]=> (Z !-> 42).
 Proof.
-(* 请在此处解答 *) Admitted.
+  apply E_Seq with empty_st.
+  - apply E_Skip.
+  - apply E_Havoc with (n:=42).
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_Check_rule_for_HAVOC : option (nat*string) := None.
@@ -1454,7 +1667,42 @@ Definition pYX :=
 
 Theorem pXY_cequiv_pYX :
   cequiv pXY pYX \/ ~cequiv pXY pYX.
-Proof. (* 请在此处解答 *) Admitted.
+Proof.
+  left. unfold pXY. unfold pYX. unfold cequiv.
+  intros. split.
+  - intros. inversion H; subst. inversion H2; subst. 
+    inversion H5; subst. 
+    apply E_Seq with (Y !-> n0; st).
+    + apply (E_Havoc st Y n0).
+    + destruct (eqb_string X Y) eqn: Exy. 
+      * apply eqb_string_true_iff in Exy. 
+        rewrite Exy. rewrite t_update_shadow.
+        replace ((Y !-> n0; st) =[ (HAVOC Y)%imp]=> (Y !-> n0; st))
+          with ((Y !-> n0; st) =[ (HAVOC Y)%imp]=> (Y !-> n0; Y !-> n0; st)).
+        ** apply (E_Havoc (Y!->n0; st) Y n0).
+        ** rewrite t_update_shadow with (v1:=n0). reflexivity.
+      * apply eqb_string_false_iff in Exy.   
+        rewrite t_update_permute. 
+        ** apply (E_Havoc (Y !-> n0; st) X n). 
+        ** assumption.
+  - intros. inversion H; subst. inversion H2; subst. 
+    inversion H5; subst. 
+    apply E_Seq with (X !-> n0; st).
+    + apply (E_Havoc st X n0).
+    + destruct (eqb_string X Y) eqn: Exy. 
+      * apply eqb_string_true_iff in Exy. 
+        rewrite Exy. rewrite t_update_shadow.
+        replace ((Y !-> n0; st) =[ (HAVOC Y)%imp]=> (Y !-> n0; st))
+          with ((Y !-> n0; st) =[ (HAVOC Y)%imp]=> (Y !-> n0; Y !-> n0; st)).
+        ** apply (E_Havoc (Y!->n0; st) Y n0).
+        ** rewrite t_update_shadow with (v1:=n0). reflexivity.
+      * apply eqb_string_false_iff in Exy.   
+        rewrite t_update_permute. 
+        ** apply (E_Havoc (X !-> n0; st) Y n). 
+        ** symmetry. assumption.
+Qed.  
+
+
 (** [] *)
 
 (** **** 练习：4 星, standard, optional (havoc_copy) 
@@ -1471,7 +1719,18 @@ Definition pcopy :=
 
 Theorem ptwice_cequiv_pcopy :
   cequiv ptwice pcopy \/ ~cequiv ptwice pcopy.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  right. unfold not; intros contra.
+  remember (Y !-> 1 ; X !-> 1) as st1.
+  remember (Y !-> 2 ; X !-> 1) as st2.
+  assert (H1 : empty_st =[ pcopy ]=> st1);
+  try apply E_Seq with (X !-> 1); try apply E_Havoc with (n:=1);
+    try (rewrite Heqst1; apply E_Ass; simpl; reflexivity).
+  assert (H2 : empty_st =[ ptwice ]=> st2); try apply E_Seq with (X !-> 1);
+    try apply E_Havoc with (n:=1);
+    try (rewrite Heqst2; apply E_Havoc with (n:=2)).
+  apply contra in H2. unfold pcopy in *. 
+Abort.
 (** [] *)
 
 (** 我们在这里使用的程序等价关系的定义对无限循环的程序来说有点复杂。因为

@@ -7,7 +7,7 @@ Please do not treat this as an exercise solution.
 I am currently working on Vol 2: PLF.
 | LF 章节 | 进度 | PLF 章节 | 进度 |
 | --- | --- | --- | --- |
-| Basics | √ | Equiv | 50%~ |
+| Basics | √ | Equiv | 75%~ |
 | Induction | √ | ... | × |
 | Lists | √ |
 | Poly | √ |
