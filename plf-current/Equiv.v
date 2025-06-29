@@ -1720,6 +1720,29 @@ Definition pcopy :=
 Theorem ptwice_cequiv_pcopy :
   cequiv ptwice pcopy \/ ~cequiv ptwice pcopy.
 Proof. 
+  destruct (eqb_string X Y) eqn: Exy.
+  - left. apply eqb_string_true_iff in Exy.
+    intros st st'. split; intros.
+    + inversion H; subst. unfold pcopy.
+      rewrite Exy in *. inversion H2; subst.
+      inversion H5; subst.
+      rewrite t_update_shadow in *.
+      apply E_Seq with (Y!->n0; st).
+      * apply E_Havoc with (n:=n0).
+      * rewrite <- t_update_same with (x:=Y).
+        rewrite t_update_eq. apply E_Ass.
+        simpl. apply t_update_eq.
+    + inversion H; subst. unfold ptwice.
+      rewrite Exy in *. inversion H5; subst.
+      inversion H2; subst. 
+      rewrite t_update_shadow in *.
+      simpl in *.
+      rewrite t_update_eq in *.
+      apply E_Seq with (Y!->n; st).
+      * apply E_Havoc with (n:=n).
+      * rewrite <- t_update_same with (x:=Y).
+        rewrite t_update_eq. apply E_Havoc with (n:=n).
+  - apply eqb_string_false_iff in Exy.
   right. unfold not; intros contra.
   remember (Y !-> 1 ; X !-> 1) as st1.
   remember (Y !-> 2 ; X !-> 1) as st2.
@@ -1729,8 +1752,31 @@ Proof.
   assert (H2 : empty_st =[ ptwice ]=> st2); try apply E_Seq with (X !-> 1);
     try apply E_Havoc with (n:=1);
     try (rewrite Heqst2; apply E_Havoc with (n:=2)).
-  apply contra in H2. unfold pcopy in *. 
-Abort.
+  apply contra in H2. unfold pcopy in *.
+  rewrite Heqst1 in *. rewrite Heqst2 in *.
+  inversion H1; subst.
+  inversion H2; subst.
+  inversion H4; subst.
+  assert (aeval (X !-> n) X = n).
+  { simpl. apply t_update_eq. }
+  apply E_Ass with (x := Y) in H.
+
+  inversion H8; subst. simpl in *. rewrite t_update_eq in H10.
+  remember (Y !-> n ; X !-> n) as st1.
+  remember (Y !-> 2 ; X !-> 1) as st2.
+  assert (st1 Y = st2 Y).
+  { rewrite H10. reflexivity. }
+  assert (st1 X = st2 X).
+  { rewrite H10. reflexivity. }
+  subst. rewrite t_update_eq in H0. rewrite t_update_eq in H0.
+  rewrite t_update_neq in H5; try (symmetry; assumption).
+  rewrite t_update_eq in H5.
+  rewrite t_update_neq in H5; try (symmetry; assumption).
+  rewrite t_update_eq in H5.
+  rewrite H0 in H5.
+  discriminate.
+Qed.
+ 
 (** [] *)
 
 (** 我们在这里使用的程序等价关系的定义对无限循环的程序来说有点复杂。因为
@@ -1760,12 +1806,36 @@ Definition p2 : com :=
 
 Lemma p1_may_diverge : forall st st', st X <> 0 ->
   ~ st =[ p1 ]=> st'.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  intros st st' H contra. remember p1 as p1'.
+  induction contra; subst; try discriminate.
+  - injection Heqp1' as H'; subst.
+    simpl in H0. apply negb_false_iff in H0. apply eqb_eq in H0.
+    apply H; assumption.
+  - apply IHcontra2; try assumption.
+    injection Heqp1' as H'; subst.
+    inversion contra1; subst. inversion H3; subst.
+    inversion H6; subst. simpl. 
+    rewrite t_update_eq. destruct (eqb_string X Y) eqn:Exy. 
+    + apply eqb_string_true_iff in Exy. rewrite Exy in *.
+      rewrite t_update_eq. intros contra. discriminate.
+    + apply eqb_string_false_iff in Exy. 
+      rewrite t_update_neq; try (symmetry; assumption).
+      rewrite add_comm. intros contra; discriminate.
+Qed. 
 
 Lemma p2_may_diverge : forall st st', st X <> 0 ->
   ~ st =[ p2 ]=> st'.
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros st st' H contra. remember p2 as p2'.
+  induction contra; subst; try discriminate.
+  - injection Heqp2' as H'; subst.
+    simpl in H0. apply negb_false_iff in H0. apply eqb_eq in H0.
+    apply H; assumption.
+  - apply IHcontra2; try assumption.
+    injection Heqp2' as H'; subst.
+    inversion contra1; subst. assumption.
+Qed.
 (** [] *)
 
 (** **** 练习：4 星, advanced (p1_p2_equiv) 
@@ -1773,7 +1843,17 @@ Proof.
     使用这两个引理来证明 [p1] 和 [p2] 确实等价。 *)
 
 Theorem p1_p2_equiv : cequiv p1 p2.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  unfold cequiv; intros. 
+  destruct (st X =? 0) eqn:Ex.
+  - split; intros;
+    try (inversion H; subst; 
+      try (apply E_WhileFalse; assumption); 
+      try (simpl in *; rewrite Ex in *; discriminate)).
+  - apply eqb_neq in Ex. split; intros.
+    + exfalso. apply (p1_may_diverge st st'); assumption.
+    + exfalso. apply (p2_may_diverge st st'); assumption.
+Qed. 
 (** [] *)
 
 (** **** 练习：4 星, advanced (p3_p4_inequiv) 
@@ -1793,7 +1873,83 @@ Definition p4 : com :=
   Z ::= 1)%imp.
 
 Theorem p3_p4_inequiv : ~ cequiv p3 p4.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  destruct (eqb_string X Z) eqn:Exz.
+  - apply eqb_string_true_iff in Exz.
+    intros contra.
+    remember (Z !-> 0) as st1.
+    remember (Z !-> 1) as st2.
+    assert (empty_st =[ p3 ]=> st1).
+    { 
+      apply E_Seq with (Z !-> 1); try (apply E_Ass; reflexivity).
+      rewrite Exz.
+      apply E_WhileTrue with (Z!->0); simpl; try reflexivity.
+      - apply E_Seq with (Z!->0).
+        + replace (Z!->0) with (Z!->0;Z!->1);
+          try apply E_Havoc with (n:=0);
+          try apply t_update_shadow.
+        + replace ((Z !-> 0) =[ (HAVOC Z)%imp ]=> (Z !-> 0)) with ((Z !-> 0) =[ (HAVOC Z)%imp ]=> (Z !-> 0;Z !-> 0)).
+          * apply E_Havoc with (n:=0).
+          * rewrite t_update_shadow. reflexivity.
+      - subst. apply E_WhileFalse. simpl. reflexivity.    
+    }
+    assert (empty_st =[p4]=> st2).
+    {
+      apply E_Seq with (X!->0); try apply E_Ass; try reflexivity.
+      rewrite Exz. rewrite <- t_update_shadow with (v1:=0) in Heqst2.
+      subst. apply E_Ass. reflexivity. 
+    }
+    apply contra in H.
+    inversion H; subst. rewrite Exz in *.
+    inversion H3; subst. simpl in *. inversion H6; subst.
+    simpl in H5.
+    assert ((Z!->n; Z !->0) Z = (Z!->0)Z).
+    {
+      rewrite H7. reflexivity.
+    }
+    rewrite t_update_shadow in H1. rewrite t_update_eq in H1.
+    rewrite t_update_eq in H1. rewrite H1 in H5. discriminate.
+  - apply eqb_string_false_iff in Exz.
+  intros contra. 
+  remember (X !-> 0; Z !-> 1) as st1.
+  remember (X !-> 0; Z !-> 2) as st2.
+  assert ((X !-> 1) =[ p3 ]=> st2).
+  { 
+    apply E_Seq with (Z !-> 1; X !-> 1); try (apply E_Ass; reflexivity). 
+    apply E_WhileTrue with (st':=(Z!->2;X!->0; Z!->1; X!->1)); try reflexivity.
+    - apply E_Seq with (X!->0; Z!->1; X!->1).
+      + apply E_Havoc with (n:=0).
+      + apply E_Havoc with (n:=2).
+    - rewrite t_update_permute; try assumption.
+      rewrite t_update_shadow.
+      rewrite t_update_permute; try (symmetry; assumption). 
+      rewrite t_update_shadow.
+      rewrite t_update_permute; try assumption.
+      subst. apply E_WhileFalse.
+      simpl. reflexivity.     
+  }
+  assert ((X !-> 1)=[p4]=> st1).
+  {
+    apply E_Seq with (X!->0;X!->1); try apply E_Ass; try reflexivity.
+    rewrite t_update_shadow. subst.
+    rewrite t_update_permute; try (symmetry; assumption).
+    apply E_Ass. reflexivity.
+  }
+  apply contra in H.
+  inversion H; subst.
+  inversion H3; subst. simpl in *.
+  rewrite t_update_shadow in *.
+  rewrite t_update_permute in H6; try (symmetry; assumption).
+  inversion H6; subst. simpl in *.
+  remember (Z !-> 1; X !-> 0) as st1.
+  remember (Z !-> 2; X !-> 0) as st2.
+  assert (st1 Z = st2 Z). {
+    rewrite H7. reflexivity.
+  }
+  subst. rewrite t_update_eq in H1. rewrite t_update_eq in H1.
+  discriminate.
+Qed.
+  
 (** [] *)
 
 (** **** 练习：5 星, advanced, optional (p5_p6_equiv) 
@@ -1812,7 +1968,36 @@ Definition p6 : com :=
   (X ::= 1)%imp.
 
 Theorem p5_p6_equiv : cequiv p5 p6.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  intros st st'. split; intros.
+  - remember p5 as p5'. induction H; try discriminate.
+    + injection Heqp5' as H4. rewrite H4 in H. 
+      simpl in H. apply negb_false_iff in H.
+      apply eqb_eq in H. unfold p6.
+      replace (st =[(X ::= 1)%imp]=> st) with (st =[(X::=1)%imp]=> (X!->1;st)).
+      * apply E_Ass. reflexivity.
+      * rewrite <- H.
+        rewrite t_update_same. reflexivity.
+    + injection Heqp5' as H2. rewrite H2 in H. 
+      simpl in H. apply negb_true_iff in H.
+      apply eqb_neq in H. subst.
+      inversion H0; subst.
+      remember p6 as p6'.
+      destruct IHceval2; try reflexivity; try discriminate.
+      subst. injection Heqp6' as Ha1 Ha2; subst.
+      simpl. inversion H0; subst. rewrite t_update_shadow.
+      apply E_Ass; reflexivity.
+  - remember p6 as p6'. induction H; try discriminate.
+    subst. injection Heqp6' as Ha1 Ha2; subst. simpl.
+    unfold p5. destruct (eqb (st X) 1) eqn:Ex.
+    + apply eqb_eq in Ex. rewrite <- Ex. rewrite t_update_same. 
+      apply E_WhileFalse. simpl. apply negb_false_iff.
+      apply eqb_eq. reflexivity.
+    + apply eqb_neq in Ex. apply E_WhileTrue with (st':=(X!->1;st)).
+      * simpl. apply negb_true_iff. apply eqb_neq; auto.
+      * apply E_Havoc.
+      * apply E_WhileFalse; auto.
+Qed. 
 (** [] *)
 
 End Himp.
@@ -1840,6 +2025,89 @@ End Himp.
 (* 请在此处解答
 
     [] *)
+Module ForImp.
+Inductive com : Type :=
+  | CSkip                     
+  | CAss (x : string) (a : aexp)
+  | CSeq (c1 c2 : com)
+  | CIf (b : bexp) (c1 c2 : com)
+  | CWhile (b : bexp) (c : com)
+  | CFor (c1: com) (b: bexp) (c2: com) (c3: com).
+
+Notation "'SKIP'" :=
+  CSkip.
+Notation "x '::=' a" :=
+  (CAss x a) (at level 60).
+Notation "c1 ;; c2" :=
+  (CSeq c1 c2) (at level 80, right associativity).
+Notation "'WHILE' b 'DO' c 'END'" :=
+  (CWhile b c) (at level 80, right associativity).
+Notation "'TEST' c1 'THEN' c2 'ELSE' c3 'FI'" :=
+  (CIf c1 c2 c3) (at level 80, right associativity).
+
+Reserved Notation "st '=[' c ']=>' st'"
+         (at level 40, st' at next level).
+
+Inductive ceval : com -> state -> state -> Prop :=
+  | E_Skip : forall st,
+      st =[ SKIP ]=> st
+  | E_Ass  : forall st a1 n x,
+      aeval st a1 = n ->
+      st =[ x ::= a1 ]=> (x !-> n ; st)
+  | E_Seq : forall c1 c2 st st' st'',
+      st  =[ c1 ]=> st'  ->
+      st' =[ c2 ]=> st'' ->
+      st  =[ c1 ;; c2 ]=> st''
+  | E_IfTrue : forall st st' b c1 c2,
+      beval st b = true ->
+      st =[ c1 ]=> st' ->
+      st =[ TEST b THEN c1 ELSE c2 FI ]=> st'
+  | E_IfFalse : forall st st' b c1 c2,
+      beval st b = false ->
+      st =[ c2 ]=> st' ->
+      st =[ TEST b THEN c1 ELSE c2 FI ]=> st'
+  | E_WhileFalse : forall b st c,
+      beval st b = false ->
+      st =[ WHILE b DO c END ]=> st
+  | E_WhileTrue : forall st st' st'' b c,
+      beval st b = true ->
+      st  =[ c ]=> st' ->
+      st' =[ WHILE b DO c END ]=> st'' ->
+      st  =[ WHILE b DO c END ]=> st''
+  | E_ForFalse : forall st st' c1 b c2 c3,
+      beval st' b = false ->
+      st =[ c1 ]=> st' ->
+      st =[ (CFor c1 b c2 c3) ]=> st'
+  | E_ForTrue : forall st st' st'' st''' c1 b c2 c3,
+      beval st' b = true ->
+      st =[ c1 ]=> st' ->
+      st' =[ c2 ;; c3 ]=> st'' ->
+      st'' =[ WHILE b DO c2 ;; c3 END ]=> st''' ->
+      st =[ (CFor c1 b c2 c3 )]=> st'''
+
+  where "st =[ c ]=> st'" := (ceval c st st').
+
+Definition cequiv (c1 c2 : com) : Prop :=
+  forall (st st' : state),
+    (st =[ c1 ]=> st') <-> (st =[ c2 ]=> st').
+
+Theorem while_equiv_for: forall c1 c2 c3 b, 
+  cequiv (CFor c1 b c2 c3) (c1 ;; WHILE b DO c2 ;; c3 END).
+Proof.
+  intros. unfold cequiv. intros.
+  split; intros.
+  - inversion H; subst.
+    + apply E_Seq with st'; auto.
+      apply E_WhileFalse; auto.
+    + apply E_Seq with st'0; auto.
+      apply E_WhileTrue with st''; auto.
+  - inversion H; subst.
+    inversion H5; subst.
+    + apply E_ForFalse; auto.
+    + apply E_ForTrue with st'0 st'1; auto.
+Qed.
+
+End ForImp.
 
 (** **** 练习：3 星, standard, optional (swap_noninterfering_assignments) 
 
@@ -1853,7 +2121,20 @@ Theorem swap_noninterfering_assignments: forall l1 l2 a1 a2,
     (l1 ::= a1;; l2 ::= a2)
     (l2 ::= a2;; l1 ::= a1).
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros. unfold cequiv; intros. split; intros.
+  - inversion H2; subst. inversion H5; subst.
+    inversion H8; subst. rewrite aeval_weakening; auto.
+    rewrite t_update_permute; auto.
+    apply E_Seq with (l2 !-> aeval st a2; st); 
+    try (constructor; reflexivity).
+    apply E_Ass. rewrite aeval_weakening; auto.
+  - inversion H2; subst. inversion H5; subst.
+    inversion H8; subst. rewrite aeval_weakening; auto.
+    rewrite t_update_permute; auto.
+    apply E_Seq with (l1 !-> aeval st a1; st); 
+    try (constructor; reflexivity).
+    apply E_Ass. rewrite aeval_weakening; auto.
+Qed.
 (** [] *)
 
 (** **** 练习：4 星, advanced, optional (capprox) 
@@ -1878,29 +2159,63 @@ Definition capprox (c1 c2 : com) : Prop := forall (st st' : state),
 (** 请找出两个程序 [c3] 和 [c4]，它们互不近似。 *)
 
 Definition c3 : com
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+  := X ::= 1.
 Definition c4 : com
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+  := X ::= 2.
 
 Theorem c3_c4_different : ~ capprox c3 c4 /\ ~ capprox c4 c3.
-Proof. (* 请在此处解答 *) Admitted.
+Proof.
+  split; unfold not; intros.
+  - unfold capprox in H. 
+    assert(Hctra1: empty_st =[ c3 ]=> (X!->1; empty_st)). {
+      apply E_Ass; auto.
+    }
+    assert(Hctra2: empty_st =[ c4 ]=> (X!->2; empty_st)). {
+      apply E_Ass; auto.
+    }
+    apply (H empty_st (X!->1)) in Hctra1.
+    apply (ceval_deterministic c4 empty_st (X!->1) (X!->2)) in Hctra1; auto.
+    assert ((X!->1)X = 1); auto.
+    rewrite Hctra1 in H0. discriminate.
+  - unfold capprox in H. 
+    assert(Hctra1: empty_st =[ c3 ]=> (X!->1; empty_st)). {
+      apply E_Ass; auto.
+    }
+    assert(Hctra2: empty_st =[ c4 ]=> (X!->2; empty_st)). {
+      apply E_Ass; auto.
+    }
+    apply (H empty_st (X!->2)) in Hctra2.
+    apply (ceval_deterministic c3 empty_st (X!->2) (X!->1)) in Hctra1; auto.
+    assert ((X!->2)X = 2); auto.
+    rewrite Hctra1 in H0. discriminate.
+Qed.
+    
 
 (** 找出一个程序 [cmin] 近似于所有别的程序。 *)
 
-Definition cmin : com
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition cmin : com :=
+  WHILE true DO SKIP END.
 
 Theorem cmin_minimal : forall c, capprox cmin c.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  intros; unfold capprox; intros.
+  exfalso. apply WHILE_true_nonterm in H; auto.
+  simpl. unfold bequiv. intros. simpl. reflexivity.
+Qed.
 
 (** 最后，再找出程序近似的一个非平凡的属性（当从左到右时）。 *)
 
-Definition zprop (c : com) : Prop
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition zprop (c : com) : Prop :=
+  exists st st', st =[ c ]=> st'.
 
 Theorem zprop_preserving : forall c c',
   zprop c -> capprox c c' -> zprop c'.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  intros; unfold zprop in *. 
+  destruct H as [st [st' H]].
+  exists st. exists st'.
+  apply H0; auto.
+Qed.
 (** [] *)
 
 (* 2022-03-14 05:28:20 (UTC+00) *)

@@ -759,62 +759,54 @@ Proof.
        | s1 re1 re2 Hmatch IH | re1 s2 re2 Hmatch IH
        | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ];
   try (simpl; lia).
-  - simpl. intros H1. rewrite app_length in H1. 
-    apply add_le_cases in H1. destruct H1 as [H11 | H12].
-    + destruct IH1 as [s1' [s2' [s3' [IH11 [IH12 IH13]]]]]. 
-      apply H11. exists s1'. exists s2'. exists (s3'++s2). 
-      split.
-      * rewrite IH11. repeat rewrite app_assoc. reflexivity.
-      * split. apply IH12.
-        { 
-          intros m. repeat rewrite app_assoc.
-          apply MApp. 
-          { rewrite <- app_assoc. auto. }
-          { auto. }
-        }
-    + destruct IH2 as [s1' [s2' [s3' [IH11 [IH12 IH13]]]]]. 
-      apply H12. exists (s1++s1'). exists s2'. exists s3'.
-      split.
-      * rewrite IH11. 
-        repeat rewrite app_assoc.
-        reflexivity.
-      * split. apply IH12.
-        intros m. rewrite <- app_assoc. auto using MApp.
-  - simpl. intros H1. apply plus_le in H1. destruct H1 as [H11 H12].
-    destruct IH as [s2' [s3' [s4' [IH11 [IH12 IH13]]]]].
-    apply H11. exists s2'. exists s3'. exists s4'.
-    auto using MUnionL.
-  - simpl. intros H1. apply plus_le in H1. destruct H1 as [H11 H12].
-    destruct IH as [s2' [s3' [s4' [IH11 [IH12 IH13]]]]].
-    apply H12. exists s2'. exists s3'. exists s4'.
-    auto using MUnionR.
-  - simpl. intros contra. 
-    inversion contra.
-    apply pumping_constant_0_false in H0. destruct H0.
-  - remember (Star re) as re'. induction Hmatch2;
-    try (inversion Heqre'; fail). 
-    + injection Heqre' as Heqre''. intros H. 
-      rewrite app_nil_r in *. 
-      simpl in H. destruct IH1 as [s2' [s3' [s4' [IH11 [IH12 IH13]]]]]. 
-      rewrite Heqre'' in *. apply H. 
-      exists s2'. exists s3'. exists s4'.
-      split. auto. split. auto.
-      intros m. apply MStar1. rewrite Heqre''.
-      apply IH13.
-    + injection Heqre' as Heqre''. rewrite Heqre'' in *. 
-      intros H.
-      destruct s0 as [| h t] eqn:Hs0.
-      * simpl. destruct IHHmatch2_2 as [s1' [s2' [s3' [IH11 [IH12 IH13]]]]].
-        reflexivity. simpl in IH2. apply IH2.
-        simpl in H. apply H.
-        exists s1'. exists s2'. exists s3'.
-        auto.
-      * exists s1. exists (h::t). exists s2.
-        split. reflexivity. split.
-        unfold not. intros contra. discriminate contra.
-        intros m. apply MStarApp.
-        apply Hmatch1. apply napp_star; auto.
+  - intros; simpl in *. rewrite app_length in H.
+    apply add_le_cases in H. 
+    destruct H as [H | H].
+    + destruct IH1; auto.
+      destruct H0; destruct H0; destruct H0; destruct H1.
+      exists x. exists x0. exists (x1 ++ s2).
+      split; subst. repeat rewrite <- app_assoc; auto.
+      split; auto. intros. rewrite app_assoc. rewrite app_assoc.
+      apply MApp; auto. rewrite <- app_assoc. auto.
+    + destruct IH2; auto.
+      destruct H0; destruct H0; destruct H0; destruct H1.
+      exists (s1 ++ x). exists x0. exists x1.
+      split; subst. repeat rewrite <- app_assoc; auto.
+      split; auto. intros. rewrite <- app_assoc. 
+      apply MApp; auto. 
+  - intros; simpl in *. destruct IH; try lia.
+    destruct H0. destruct H0. destruct H0. destruct H1.
+    exists x. exists x0. exists x1.
+    split; auto.
+    split; auto.
+    intros; apply MUnionL; auto.
+  - intros; simpl in *. destruct IH; try lia.
+    destruct H0. destruct H0. destruct H0. destruct H1.
+    exists x. exists x0. exists x1.
+    split; auto.
+    split; auto.
+    intros; apply MUnionR; auto.
+  - simpl. intros. exfalso.
+    apply (pumping_constant_0_false T re); lia.
+  - intros; simpl in *. rewrite app_length in H.
+    destruct (leb (pumping_constant re) (length s1)) eqn:Eh.
+    + apply leb_iff in Eh. destruct IH1; try lia.
+      destruct H0; destruct H0; destruct H0; destruct H1.
+      exists x. exists x0. exists (x1++s2).
+      split; subst. repeat rewrite <- app_assoc; auto.
+      split; auto. intros. rewrite app_assoc. rewrite app_assoc. 
+      apply MStarApp; auto. rewrite <- app_assoc; auto. 
+    + apply le_false_ge in Eh. destruct s1; subst; simpl in *.
+      * destruct IH2; auto.
+        destruct H0; destruct H0; destruct H0; destruct H1.
+        exists x. exists x0. exists x1.
+        split; auto.
+      * exists []. exists (x::s1). exists s2.
+        split; try rewrite app_nil_r; auto.
+        split; try (intros contra; discriminate).
+        intros; simpl. apply napp_star; auto.
 Qed.
+
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_pumping_redux : option (nat*string) := None.
 (** [] *)
@@ -825,7 +817,6 @@ Definition manual_grade_for_pumping_redux : option (nat*string) := None.
     shorten your proof (or the "official" solution proof) of the stronger
     Pumping Lemma exercise from [IndProp]. *)
 Import Pumping.
-Hint Resolve pumping : core.
 Lemma pumping : forall T (re : reg_exp T) s,
   s =~ re ->
   pumping_constant re <= length s ->
@@ -835,7 +826,114 @@ Lemma pumping : forall T (re : reg_exp T) s,
     length s1 + length s2 <= pumping_constant re /\
     forall m, s1 ++ napp m s2 ++ s3 =~ re.
 Proof.
-auto. Qed.
+  intros T re s Hmatch.
+  induction Hmatch
+    as [ | x | s1 re1 s2 re2 Hmatch1 IH1 Hmatch2 IH2
+       | s1 re1 re2 Hmatch IH | re1 s2 re2 Hmatch IH
+       | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ].
+  - (* MEmpty *)
+    simpl. intros contra. inversion contra.
+    - simpl. intros contra. inversion contra. inversion H0.
+    - simpl. intros H1. rewrite app_length in H1. 
+      apply add_le_cases in H1 as H1'. destruct H1' as [H11 | H12].
+      + destruct IH1 as [s1' [s2' [s3' [IH11 [IH12 [IH13 IH14]]]]]]. 
+        apply H11. exists s1'. exists s2'. exists (s3'++s2).
+        split.
+        * rewrite IH11. 
+          rewrite app_assoc. rewrite app_assoc. 
+          rewrite app_assoc. reflexivity.
+        * split. apply IH12.
+          split. 
+          apply (le_trans (length s1' + length s2') (pumping_constant re1) (pumping_constant re1 + pumping_constant re2)). 
+          apply IH13. apply le_plus_l.
+          { 
+            intros m. rewrite app_assoc. rewrite app_assoc.
+            apply MApp. 
+            { rewrite <- app_assoc. apply IH14. }
+            { apply Hmatch2. }
+          }
+      + destruct IH2 as [s1' [s2' [s3' [IH11 [IH12 [IH13 IH14]]]]]]. 
+        apply H12. destruct (leb (pumping_constant re1) (length s1)) eqn:Eleb.
+        * apply leb_iff in Eleb.
+          destruct IH1 as [s1'' [s2'' [s3'' [IH11' [IH12'[IH13' IH14']]]]]].
+          apply Eleb.
+          exists s1''. exists s2''. exists (s3''++s2).
+        split. rewrite IH11'.
+        rewrite app_assoc. rewrite app_assoc. 
+        rewrite app_assoc. reflexivity.
+        split. apply IH12'.
+        split. apply (le_trans (length s1'' + length s2'') (pumping_constant re1) (pumping_constant re1 + pumping_constant re2)). 
+        apply IH13'. apply le_plus_l.
+        { 
+            intros m. rewrite app_assoc. rewrite app_assoc.
+            apply MApp. 
+            { rewrite <- app_assoc. apply IH14'. }
+            { apply Hmatch2. }
+          }
+        * apply le_false_ge in Eleb. 
+          exists (s1++s1'). exists s2'. exists s3'.
+          split. rewrite IH11. 
+          rewrite app_assoc. rewrite app_assoc. 
+          reflexivity.
+          split. { apply IH12. } split.
+          simpl. rewrite app_length. rewrite <- plus_assoc.
+          apply plus_le_plus. split.
+          apply Eleb. apply IH13.
+          { 
+            intros m. rewrite <- app_assoc. apply MApp. 
+            { apply Hmatch1. }
+            { apply IH14. }
+          }
+    - simpl. intros H1. apply plus_le in H1. destruct H1 as [H11 H12].
+      destruct IH as [s2' [s3' [s4' [IH11 [IH12 [IH13 IH14]]]]]].
+      apply H11. exists s2'. exists s3'. exists s4'.
+      split. apply IH11. split. apply IH12. 
+      split. apply (le_trans (length s2' + length s3') (pumping_constant re1) (pumping_constant re1 + pumping_constant re2)).
+      apply IH13. apply le_plus_l. 
+      intros m. apply MUnionL. apply IH14.
+    - simpl. intros H1. apply plus_le in H1. destruct H1 as [H11 H12].
+      destruct IH as [s2' [s3' [s4' [IH11 [IH12 [IH13 IH14]]]]]].
+      apply H12. exists s2'. exists s3'. exists s4'.
+      split. apply IH11. split. apply IH12.
+      split. apply (le_trans (length s2' + length s3') (pumping_constant re2) (pumping_constant re1 + pumping_constant re2)).
+      apply IH13. rewrite plus_comm. apply le_plus_l.   
+      intros m. apply MUnionR. apply IH14.
+    - simpl. intros contra. 
+      inversion contra.
+      apply pumping_constant_0_false in H0. destruct H0.
+    - intros H. destruct s1 as [|h t] eqn:Es1.
+      + simpl in *. 
+        destruct IH2 as [s1' [s2' [s3' [IH21 [IH22 [IH23 IH24]]]]]].
+        * apply H. 
+        * exists s1'. exists s2'. exists s3'.
+          split. apply IH21.
+          split. apply IH22.
+          split. apply IH23.
+          apply IH24.
+      + destruct (leb (pumping_constant re) (length (h::t))) eqn:Elen.
+        * apply leb_iff in Elen.
+          destruct IH1 as [s1' [s2' [s3' [IH11 [IH12 [IH13 IH14]]]]]].
+          apply Elen.
+          exists s1'. exists s2'. exists (s3'++s2).
+          split. rewrite IH11. rewrite <- app_assoc. rewrite <- app_assoc.
+          reflexivity.
+          split. apply IH12.
+          split. apply IH13.
+          intros m. rewrite app_assoc. rewrite app_assoc. 
+          rewrite <- (app_assoc T s1' (napp m s2') s3').
+          apply MStarApp.
+          ** apply IH14.
+          ** apply Hmatch2.
+        * exists []. exists s1. exists s2.
+          simpl in *. split. rewrite Es1. simpl. reflexivity.
+          split. rewrite Es1. unfold not. intros contra.
+          discriminate contra.
+          split. apply le_false_ge in Elen. 
+          rewrite Es1. simpl. apply Elen.
+          intros m. apply napp_star. 
+          rewrite Es1. apply Hmatch1.
+          apply Hmatch2.
+Qed.
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_pumping_redux_strong : option (nat*string) := None.
 (** [] *)

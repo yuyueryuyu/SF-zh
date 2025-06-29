@@ -1639,7 +1639,7 @@ Definition implies_to_or := forall P Q:Prop,
 (* 请在此处解答
 
     [] *)
-
+(* 当P和Q相同时，P->P显然为真，所以显然P \/ P 成立 *)
 Theorem p1 : implies_to_or -> excluded_middle.
 Proof.
   unfold implies_to_or. unfold excluded_middle.
@@ -1649,6 +1649,38 @@ Proof.
   - left. apply H0.
 Qed.
 
+(* 有排中律后，若P为真，显然成立，否则P为假，P->Q显然成立，由此可推得P成立 
+  这里的证法套用了((P->Q)->P)->(~(P->Q)\/P)
+  (P->Q)->P由假设成立，若右边成立则P成立；若左边成立则P不可能为False
+  （因为若P为False则P->Q恒成立，显然存在矛盾。
+*)
+Theorem im_to_peirce: implies_to_or -> peirce.
+Proof.
+  unfold implies_to_or. unfold peirce.
+  intros H P Q. intros. destruct (H (P->Q) (P)); auto.
+  destruct (H P P); auto.
+  exfalso. apply H1. intros. exfalso. apply H2. assumption.
+Qed.
+
+(*
+  首先推得排中律，若P成立则显然成立，若~P成立则~~P为False，同样成立
+*)
+Theorem imp_to_dbl_neg: implies_to_or -> double_negation_elimination.
+  unfold implies_to_or. unfold double_negation_elimination.
+  intros H P. destruct (H P P); auto.
+  intros. exfalso. apply H1; assumption.
+Qed.
+
+(*
+首先推得排中律，然后就可以推真值表
+*)
+Theorem imp_to_demorgan: implies_to_or -> de_morgan_not_and_not.
+  unfold implies_to_or. unfold de_morgan_not_and_not.
+  intros H P Q. destruct (H P P); auto.
+  destruct (H Q Q); auto. intros. exfalso.
+  apply H2. split; auto.
+Qed.
+
 Theorem p2 : excluded_middle -> peirce.
   unfold excluded_middle. unfold peirce.
   intros ex_mid P Q H. destruct (ex_mid P).
@@ -1656,6 +1688,14 @@ Theorem p2 : excluded_middle -> peirce.
   - apply H. intros Hp. destruct H0.
     apply Hp.
 Qed. 
+
+(*
+对P用排中律，若P成立则由P->Q可知Q成立，若P不成立则~P成立
+*)
+Theorem excluded_middle_to_imp: excluded_middle -> implies_to_or.
+  unfold excluded_middle. unfold implies_to_or.
+  intros H P Q. destruct (H P); auto.
+Qed.
 
 Theorem p3 : peirce -> double_negation_elimination.
 Proof.
