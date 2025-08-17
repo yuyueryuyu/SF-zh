@@ -7,7 +7,7 @@ From Coq Require Import Bool.Bool.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Arith.EqNat.
 From Coq Require Import Arith.PeanoNat. Import Nat.
-From Coq Require Import omega.Omega.
+From Coq Require Import Lia.
 From PLF Require Import Hoare.
 From PLF Require Import Imp.
 
@@ -223,15 +223,15 @@ From PLF Require Import Imp.
 
        {{ True }}
       TEST X <= Y THEN
-          {{                         }} ->>
-          {{                         }}
+          {{ True /\ X <= Y }} ->>
+          {{ Y = X + (Y - X) }}
         Z ::= Y - X
-          {{                         }}
+          {{ Y = X + Z }}
       ELSE
-          {{                         }} ->>
-          {{                         }}
+          {{ True /\ ~(X <= Y) }} ->>
+          {{ X + Z = X + Z }}
         Y ::= X + Z
-          {{                         }}
+          {{ Y = X + Z }}
       FI
         {{ Y = X + Z }}
 *)
@@ -532,10 +532,16 @@ Proof.
 
         {{ X = m }}
       Y ::= 0;;
+        {{ X = m /\ Y = 0 }}
+      ->> {{ X + Y = m }}
       WHILE ~(X = 0) DO
+        {{ X + Y = m /\ ~(X - 1 + 1 = 0) }}
         X ::= X - 1;;
+        {{ X + Y - 1 = m /\ ~(X + 1 = 0) }}
         Y ::= Y + 1
+        {{ X + Y = m /\ ~(X + 1 = 0)}}
       END
+        {{ X + Y = m /\ X = 0 }} ->>
         {{ Y = m }}
 
     Write an informal decorated program showing that this procedure
@@ -565,8 +571,19 @@ Definition manual_grade_for_decorations_in_slow_assignment : option (nat*string)
     specification of [add_slowly]; then (informally) decorate the
     program accordingly. *)
 
-(* 请在此处解答
 
+    
+(* 请在此处解答
+    {{ X + Z = m }}
+    WHILE ~(X = 0) DO
+        {{ X + Z = m /\ ~(X = 0)}}
+         Z ::= Z + 1;;
+        {{ X - 1 + Z = m /\ ~(X - 1 + 1 = 0)}}
+         X ::= X - 1
+        {{ X + Z = m /\ ~(X + 1 = 0)}}
+      END
+    {{ X + Z = m /\ X = 0}} ->>
+     {{ Z = m }}
     [] *)
 
 (* ================================================================= *)
@@ -631,7 +648,7 @@ Lemma parity_ge_2 : forall x,
 Proof.
   induction x; intro. reflexivity.
   destruct x. inversion H. inversion H1.
-  simpl. rewrite <- minus_n_O. reflexivity.
+  simpl. rewrite sub_0_r. reflexivity.
 Qed.
 
 Lemma parity_lt_2 : forall x,
@@ -639,7 +656,7 @@ Lemma parity_lt_2 : forall x,
   parity x = x.
 Proof.
   intros. induction x. reflexivity. destruct x. reflexivity.
-    exfalso. apply H. omega.
+    exfalso. apply H. lia.
 Qed.
 
 Theorem parity_correct : forall (m:nat),
@@ -649,7 +666,25 @@ Theorem parity_correct : forall (m:nat),
   END
   {{  X = parity m }}.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros m.
+  apply hoare_consequence_pre with (fun st => parity (aeval st X) = parity m). 
+  eapply hoare_consequence_post.
+  apply hoare_while.
+  - eapply hoare_consequence_pre. apply hoare_asgn.
+    intros st H. unfold assn_sub, t_update. simpl.
+    destruct H as [H1 H2]. simpl in H1.
+    rewrite parity_ge_2; auto. 
+    simpl in *. destruct (st X); try discriminate.
+    destruct (n); try discriminate. lia.
+  - intros st H. destruct H as [H1 H2]. rewrite parity_lt_2 in H1.
+    simpl in *; auto.
+    simpl in H2.
+    destruct (st X) eqn:Eh. simpl. rewrite Eh. lia.
+    destruct (n) eqn:Eh2. simpl. rewrite Eh. lia.
+    exfalso. apply H2; auto.
+  - intros st H. simpl in *. rewrite H. auto.
+Qed.  
+  
 (** [] *)
 
 (* ================================================================= *)
@@ -815,18 +850,18 @@ Proof.
     well-defined on natural numbers.
 
     {{ X = m }} ->>
-    {{                                      }}
+    {{ 1 * X! = (m - X)! }}
   Y ::= 1;;
-    {{                                      }}
+    {{ Y * X! = (m - X)! }}
   WHILE ~(X = 0)
-  DO   {{                                      }} ->>
-       {{                                      }}
+  DO   {{ Y * X! = (m - X)! /\ ~(X = 0)  }} ->>
+       {{ (Y * X) * (X - 1)! = (m - X)!  /\ ~(X = 0) }}
      Y ::= Y * X;;
-       {{                                      }}
+       {{ Y * (X - 1)! = (m - (X - 1))! /\ ~(X = 0) }}
      X ::= X - 1
-       {{                                      }}
+       {{ Y * X! = (m - X)! /\ ~(X + 1 = 0) }}
   END
-    {{                                      }} ->>
+    {{ Y * X! = (m - X)! /\ X = 0 }} ->>
     {{ Y = m! }}
 *)
 
@@ -851,24 +886,24 @@ Definition manual_grade_for_decorations_in_factorial : option (nat*string) := No
   plus standard high-school algebra, as always.
 
   {{ True }} ->>
-  {{                    }}
+  {{ (min a b) + 0 = min a b }}
   X ::= a;;
-  {{                       }}
+  {{ (min X b) + 0 = min a b }}
   Y ::= b;;
-  {{                       }}
+  {{ (min X Y) + 0 = min a b }}
   Z ::= 0;;
-  {{                       }}
+  {{ (min X Y) + Z = min a b }}
   WHILE ~(X = 0) && ~(Y = 0) DO
-  {{                                     }} ->>
-  {{                                }}
+  {{ (min X Y) + Z = min a b /\ (~(X = 0) /\ ~(Y = 0))  }} ->>
+  {{ (min (X - 1) (Y - 1)) + 1 + Z = min a b }}
   X := X - 1;;
-  {{                            }}
+  {{ (min X (Y - 1)) + 1 + Z = min a b }}
   Y := Y - 1;;
-  {{                        }}
+  {{ (min X Y) + Z + 1 = min a b }}
   Z := Z + 1
-  {{                       }}
+  {{ (min X Y) + Z = min a b }}
   END
-  {{                            }} ->>
+  {{ (min X Y) + Z = min a b /\ (X = 0 \/ Y = 0) }} ->>
   {{ Z = min a b }}
 *)
 
@@ -896,32 +931,32 @@ Definition manual_grade_for_decorations_in_Min_Hoare : option (nat*string) := No
     following decorated program.
 
       {{ True }} ->>
-      {{                                        }}
+      {{ c = X + 0 + 0 }}
     X ::= 0;;
-      {{                                        }}
+      {{ c = X + 0 + c }}
     Y ::= 0;;
-      {{                                        }}
+      {{ c = X + Y + c }}
     Z ::= c;;
-      {{                                        }}
+      {{ Z = X + Y + c }}
     WHILE ~(X = a) DO
-        {{                                        }} ->>
-        {{                                        }}
+        {{ Z = X + Y + c /\ ~(X = a) }} ->>
+        {{ Z + 1 = X + 1 + Y + c }}
       X ::= X + 1;;
-        {{                                        }}
+        {{ Z + 1 = X + Y + c }}
       Z ::= Z + 1
-        {{                                        }}
+        {{ Z = X + Y + c }}
     END;;
-      {{                                        }} ->>
-      {{                                        }}
+      {{ Z = X + Y + c /\ X = a }} ->>
+      {{ Z = a + Y + c }}
     WHILE ~(Y = b) DO
-        {{                                        }} ->>
-        {{                                        }}
+        {{  Z = a + Y + c /\ ~(Y = b) }} ->>
+        {{ Z + 1 = a + Y + 1 + c }}
       Y ::= Y + 1;;
-        {{                                        }}
+        {{ Z + 1 = a + Y + c }}
       Z ::= Z + 1
-        {{                                        }}
+        {{ Z = a + Y + c }}
     END
-      {{                                        }} ->>
+      {{ Z = a + Y + c /\ Y = b }} ->>
       {{ Z = a + b + c }}
 *)
 
@@ -949,7 +984,26 @@ Definition manual_grade_for_decorations_in_two_loops : option (nat*string) := No
     Write a decorated program for this. *)
 
 (* 请在此处解答
-
+    {{ True }} ->>
+    {{ 1 - 1 = 2 ^ 0 - 1 /\ 1 = 2 ^ 0 }}
+    X ::= 0;;
+    {{ 1 - 1 = 2 ^ X - 1 /\ 1 = 2 ^ X }}
+    Y ::= 1;;
+    {{ Y - 1 = 2 ^ X - 1 /\ 1 = 2 ^ X }}
+    Z ::= 1;;
+      {{ Y - Z = 2 ^ X - 1 /\ Z = 2 ^ X }}
+    WHILE ~(X = m) DO
+      {{ Y - Z = 2 ^ X - 1 /\ Z = 2 ^ X /\ ~(X = m) }}
+      {{ Y - Z + Z = 2 ^ (X + 1) - 1 /\ Z = 2 ^ X }}
+      Z ::= 2 * Z;;
+      {{ Y + Z - Z = 2 ^ (X + 1) - 1 /\ Z = 2 ^ (X + 1) }}
+      Y ::= Y + Z;;
+      {{ Y - Z = 2 ^ (X + 1) - 1 /\ Z = 2 ^ (X + 1) }}
+      X ::= X + 1
+      {{ Y - Z = 2 ^ X - 1 /\ Z = 2 ^ X }}
+    END
+    {{ Y - Z = 2 ^ X - 1 /\ Z = 2 ^ X /\ X = m }} ->>
+    {{ Y = 2 ^ (m + 1) - 1 }}
     [] *)
 
 (* ################################################################# *)
@@ -1001,21 +1055,21 @@ Definition is_wp P c Q :=
     What are the weakest preconditions of the following commands
    for the following postconditions?
 
-  1) {{ ? }}  SKIP  {{ X = 5 }}
+  1) {{ X = 5 }}  SKIP  {{ X = 5 }}
 
-  2) {{ ? }}  X ::= Y + Z {{ X = 5 }}
+  2) {{ Y + Z = 5 }}  X ::= Y + Z {{ X = 5 }}
 
-  3) {{ ? }}  X ::= Y  {{ X = Y }}
+  3) {{ True }}  X ::= Y  {{ X = Y }}
 
-  4) {{ ? }}
+  4) {{ (X = 0 /\ Z = 4) \/ (~(X = 0) /\ W = 3) }}
      TEST X = 0 THEN Y ::= Z + 1 ELSE Y ::= W + 2 FI
      {{ Y = 5 }}
 
-  5) {{ ? }}
+  5) {{ False }}
      X ::= 5
      {{ X = 0 }}
 
-  6) {{ ? }}
+  6) {{ True }}
      WHILE true DO X ::= 0 END
      {{ X = 0 }}
 *)
@@ -1033,7 +1087,17 @@ Theorem is_wp_example :
   is_wp (Y <= 4)
     (X ::= Y + 1) (X <= 5).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  unfold is_wp. split.
+  - eapply hoare_consequence_pre. apply hoare_asgn.
+    simpl. intros st H. unfold assn_sub, t_update.
+    simpl. lia.
+  - intros P H. unfold hoare_triple in H. intros st H'.
+    assert (H2: (X !-> st Y + 1; st) X <= 5).
+    + simpl in H. apply H with st. apply E_Ass. auto. auto.
+    + rewrite t_update_eq in H2. simpl. lia.
+Qed. 
+
+
 (** [] *)
 
 (** **** 练习：2 星, advanced, optional (hoare_asgn_weakest) 
@@ -1044,7 +1108,13 @@ Proof.
 Theorem hoare_asgn_weakest : forall Q X a,
   is_wp (Q [X |-> a]) (X ::= a) Q.
 Proof.
-(* 请在此处解答 *) Admitted.
+  unfold is_wp. intros. split.
+  - apply hoare_asgn.
+  - intros. intros st H'. unfold hoare_triple in H.
+    unfold assn_sub. apply (H st (X !-> aeval st a; st)).
+    + apply E_Ass. auto.
+    + auto.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, advanced, optional (hoare_havoc_weakest) 
@@ -1058,7 +1128,11 @@ Lemma hoare_havoc_weakest : forall (P Q : Assertion) (X : string),
   {{ P }} HAVOC X {{ Q }} ->
   P ->> havoc_pre X Q.
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros. intros st H'. unfold havoc_pre. intros.
+  unfold assn_sub. unfold hoare_triple in H.
+  apply (H st (X !-> aeval st n; st)); auto.
+  apply E_Havoc.
+Qed.
 End Himp2.
 (** [] *)
 
@@ -1436,7 +1510,7 @@ Tactic Notation "verify" :=
         | [H : _ = st _ |- _] => rewrite <- H in *; clear H
         end
     end;
-  try eauto; try omega.
+  try eauto; try lia.
 
 (** What's left after [verify] does its thing is "just the interesting
     parts" of checking that the decorations are correct. For very
@@ -1525,7 +1599,6 @@ Definition div_mod_dec (a b : nat) : decorated :=
 Theorem div_mod_dec_correct : forall a b,
   dec_correct (div_mod_dec a b).
 Proof. intros a b. verify.
-  rewrite mult_plus_distr_l. omega.
 Qed.
 
 (* ----------------------------------------------------------------- *)
@@ -1560,12 +1633,12 @@ Lemma l1 : forall m n p,
   p <= n ->
   n <= m ->
   m - (n - p) = m - n + p.
-Proof. intros. omega. Qed.
+Proof. intros. lia. Qed.
 
 Lemma l2 : forall m,
   ev m ->
   ev (m + 2).
-Proof. intros. rewrite plus_comm. simpl. constructor. assumption. Qed.
+Proof. intros. rewrite add_comm. simpl. constructor. assumption. Qed.
 
 Lemma l3' : forall m,
   ev m ->
@@ -1579,7 +1652,7 @@ Lemma l3 : forall m,
   ev (m - 1) ->
   False.
 Proof. intros. apply l2 in H1.
-       assert (G : m - 1 + 2 = S m). clear H0 H1. omega.
+       assert (G : m - 1 + 2 = S m). clear H0 H1. lia.
        rewrite G in H1. apply l3' in H0. apply H0. assumption. Qed.
 
 Theorem find_parity_correct : forall m,
@@ -1589,15 +1662,15 @@ Proof.
     (* simplification too aggressive ... reverting a bit *)
     fold (2 <=? (st X)) in *;
     try rewrite leb_iff in *;
-    try rewrite leb_iff_conv in *; eauto; try omega.
+    try rewrite leb_iff_conv in *; eauto; try lia.
   - (* invariant holds initially *)
-    rewrite minus_diag. constructor.
+    rewrite sub_diag. constructor.
   - (* invariant preserved *)
     rewrite l1; try assumption.
     apply l2; assumption.
   - (* invariant strong enough to imply conclusion
          (-> direction) *)
-    rewrite <- minus_n_O in H2. assumption.
+    rewrite sub_0_r in H2. assumption.
   - (* invariant strong enough to imply conclusion
          (<- direction) *)
     destruct (st X) as [| [| n]].
@@ -1608,7 +1681,7 @@ Proof.
       apply l3 in H; try assumption. inversion H.
     + (* st X = 2 *)
       clear H0 H2. (* omega confused otherwise *)
-      omega.
+      lia.
 Qed.
 
 (** Here is a more intuitive way of writing the invariant: *)
@@ -1631,7 +1704,7 @@ Lemma l4 : forall m,
 Proof.
   induction m; intros. split; intro; constructor.
   destruct m. inversion H. inversion H1. simpl in *.
-  rewrite <- minus_n_O in *. split; intro.
+  rewrite sub_0_r in *. split; intro.
     constructor. assumption.
     inversion H0. assumption.
 Qed.
@@ -1643,7 +1716,7 @@ Proof.
     (* simplification too aggressive ... reverting a bit *)
     fold (2 <=? (st X)) in *;
     try rewrite leb_iff in *;
-    try rewrite leb_iff_conv in *; intuition; eauto; try omega.
+    try rewrite leb_iff_conv in *; intuition; eauto; try lia.
   - (* invariant preserved (part 1) *)
     rewrite l4 in H0; eauto.
   - (* invariant preserved (part 2) *)
@@ -1660,7 +1733,7 @@ Proof.
         inversion H.
       + (* st X = 2 *)
         clear H0 H H3. (* omega confused otherwise *)
-        omega.
+        lia.
 Qed.
 
 (* ----------------------------------------------------------------- *)
@@ -1718,11 +1791,11 @@ Proof.
   - (* invariant preserved *)
     destruct (st Y) as [| y'].
     + exfalso. auto.
-    + simpl. rewrite <- minus_n_O.
+    + simpl. rewrite sub_0_r.
     assert (G : forall n m, n * S m = n + n * m). {
       clear. intros. induction n. reflexivity. simpl.
-      rewrite IHn. omega. }
-    rewrite <- H. rewrite G. omega.
+      rewrite IHn. lia. }
+    rewrite <- H. rewrite G. lia.
 Qed.
 
 Definition square_dec' (n : nat) : decorated :=
@@ -1755,22 +1828,17 @@ Theorem square_dec'_correct : forall (n:nat),
   dec_correct (square_dec' n).
 Proof.
   intro n. verify.
-  - (* invariant holds initially *)
-    rewrite minus_diag. omega.
   - (* invariant preserved *) subst.
-    rewrite mult_minus_distr_l.
-    repeat rewrite mult_minus_distr_l. rewrite mult_1_r.
+    rewrite mul_sub_distr_l.
+    repeat rewrite mul_sub_distr_l. rewrite mul_1_r.
     assert (G : forall n m p,
                   m <= n -> p <= m -> n - (m - p) = n - m + p).
-      intros. omega.
-    rewrite G. reflexivity. apply mult_le_compat_l. assumption.
+      intros. lia.
+    rewrite G. reflexivity. apply mul_le_mono_l. assumption.
     destruct (st Y).
     + exfalso. auto.
-    + clear. rewrite mult_succ_r. rewrite plus_comm.
-      apply le_plus_l.
-  - (* invariant + negation of guard imply
-       desired postcondition *)
-    rewrite <- minus_n_O. reflexivity.
+    + clear. rewrite mul_succ_r. rewrite add_comm.
+    apply le_add_r.
 Qed.
 
 Definition square_simpler_dec (m : nat) : decorated :=
@@ -1796,7 +1864,6 @@ Theorem square_simpler_dec_correct : forall m,
   dec_correct (square_simpler_dec m).
 Proof.
   intro m. verify.
-  rewrite mult_plus_distr_r. omega.
 Qed.
 
 (* ----------------------------------------------------------------- *)
@@ -1838,10 +1905,10 @@ Definition dpow2_down (n : nat) :=
 
 Lemma pow2_plus_1 : forall n,
   pow2 (n+1) = pow2 n + pow2 n.
-Proof. induction n; simpl. reflexivity. omega. Qed.
+Proof. induction n; simpl. reflexivity. lia. Qed.
 
 Lemma pow2_le_1 : forall n, pow2 n >= 1.
-Proof. induction n. simpl. constructor. simpl. omega. Qed.
+Proof. induction n. simpl. constructor. simpl. lia. Qed.
 
 Theorem dpow2_down_correct : forall n,
   dec_correct (dpow2_down n).
@@ -1853,15 +1920,15 @@ Proof.
     rewrite <- plus_n_O.
     rewrite <- pow2_plus_1. remember (st X) as n.
     replace (pow2 (n + 1) - 1 + pow2 (n + 1))
-       with (pow2 (n + 1) + pow2 (n + 1) - 1) by omega.
+       with (pow2 (n + 1) + pow2 (n + 1) - 1) by lia.
     rewrite <- pow2_plus_1.
-    replace (n + 1 + 1) with (n + 2) by omega.
+    replace (n + 1 + 1) with (n + 2) by lia.
     reflexivity.
   - (* 3 *)
     rewrite <- plus_n_O. rewrite <- pow2_plus_1.
     reflexivity.
   - (* 4 *)
-    replace (st X + 1 + 1) with (st X + 2) by omega.
+    replace (st X + 1 + 1) with (st X + 2) by lia.
     reflexivity.
 Qed.
 
@@ -1896,12 +1963,25 @@ becomes
 
 *)
 
-Example slow_assignment_dec (m : nat) : decorated
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Example slow_assignment_dec (m : nat) : decorated :=
+    {{ fun st => st X = m }}
+    Y ::= 0
+    {{ fun st => st X = m /\ st Y = 0 }}
+  ->> {{ fun st => st X + st Y = m }};;
+  WHILE ~(X = 0) DO
+    {{ fun st => st X + st Y = m /\ ~(st X = 0) }} ->>
+    {{ fun st => st X - 1 + st Y + 1 = m }}
+    X ::= X - 1
+    {{ fun st => st X + st Y + 1 = m }} ;;
+    Y ::= Y + 1
+    {{ fun st => st X + st Y = m }}
+  END
+    {{ fun st => st X + st Y = m /\ st X = 0 }} ->>
+    {{ fun st => st Y = m }}.
 
 Theorem slow_assignment_dec_correct : forall m,
   dec_correct (slow_assignment_dec m).
-Proof. (* 请在此处解答 *) Admitted.
+Proof. intros m. verify. Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_check_defn_of_slow_assignment_dec : option (nat*string) := None.
@@ -1917,6 +1997,8 @@ Fixpoint fact (n : nat) : nat :=
   | O => 1
   | S n' => n * (fact n')
   end.
+
+
 *)
 
 Compute fact 5. (* ==> 120 *)
@@ -1934,6 +2016,44 @@ Compute fact 5. (* ==> 120 *)
     sure to express it with [bassn]. *)
 
 (* 请在此处解答 *)
+
+Example factorial_dec (m : nat) : decorated :=
+    {{ fun st => st X = m }}
+    Y ::= 1
+    {{ fun st => st X = m /\ st Y = 1 }}
+  ->> {{ fun st => st Y * fact (st X) = fact m }};;
+  WHILE ~(X = 0) DO
+    {{ fun st => st Y * fact (st X) = fact m /\ ~(st X = 0) }} ->>
+    {{ fun st => st Y * st X * fact (st X - 1) = fact m }}
+    Y ::= Y * X
+    {{ fun st => st Y * fact (st X - 1) = fact m }} ;;
+    X ::= X - 1
+    {{ fun st => st Y * fact (st X) = fact m }}
+  END
+    {{ fun st => st Y * fact (st X) = fact m /\ st X = 0 }} ->>
+    {{ fun st => st Y = fact m }}.
+
+Lemma fact_n_mult_n_plus_1_eq_fact_n_plus_1 : 
+  forall m, (S m) * fact m = fact (S m).
+Proof.
+  intros. simpl. replace (S m) with (1 + m) by lia.
+  rewrite mul_comm.
+  reflexivity.
+Qed.
+
+
+Theorem factorial_dec_correct : forall m,
+  dec_correct (factorial_dec m).
+Proof. 
+  intros m. verify.
+  - replace (st X) with (S(st X - 1)) by lia.
+    simpl. rewrite sub_0_r.
+    rewrite <- mul_assoc.
+    rewrite fact_n_mult_n_plus_1_eq_fact_n_plus_1.
+    replace (S (st X - 1)) with (st X) by lia.
+    assumption.
+  - simpl in H. rewrite mul_1_r in H. assumption.
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_factorial_dec : option (nat*string) := None.
@@ -1968,7 +2088,19 @@ Lemma fib_eqn : forall n,
   n > 0 ->
   fib n + fib (pred n) = fib (n + 1).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. induction n.
+  - simpl. inversion H.
+  - inversion H; subst; try reflexivity.
+    simpl. 
+    assert (Hn : exists n', n = S n').
+    {
+      induction n.
+      - inversion H1.
+      - exists n. reflexivity.
+    }
+    destruct Hn.
+    rewrite H0. rewrite (add_comm (S x) 1). simpl. lia.
+Qed.
 (** [] *)
 
 (** **** 练习：4 星, advanced, optional (fib) 
@@ -1994,12 +2126,41 @@ Proof.
 
 Definition T : string := "T".
 
-Definition dfib (n : nat) : decorated
-(* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition dfib (n : nat) : decorated :=
+    {{ fun st => True }} ->>
+    {{ fun st => 1 = fib (1 - 1) /\ 1 = fib (1) /\ 1 > 0 }}
+    X ::= 1
+    {{ fun st => 1 = fib (st X - 1) /\ 1 = fib (st X) /\ st X > 0 }};;
+    Y ::= 1
+    {{ fun st => st Y = fib (st X - 1) /\ 1 = fib (st X) /\ st X > 0}};;
+    Z ::= 1
+    {{ fun st => st Y = fib (st X - 1) /\ st Z = fib (st X) /\ st X > 0}};;
+    WHILE ~(X = n + 1) DO
+      {{ fun st => st Y = fib (st X - 1) /\ st Z = fib (st X) /\ ~(st X = n + 1) /\ st X > 0}} ->>
+      {{ fun st => st Z = fib (st X + 1 - 1) /\ st Z + st Y = fib (st X + 1) /\ st X > 0}}
+      T ::= Z
+      {{ fun st => st T = fib (st X + 1 - 1) /\ st Z + st Y = fib (st X + 1) /\ st X > 0}};;
+      Z ::= Z + Y
+      {{ fun st => st T = fib (st X + 1 - 1) /\ st Z = fib (st X + 1) /\ st X > 0}};;
+      Y ::= T
+      {{ fun st => st Y = fib (st X + 1 - 1) /\ st Z = fib (st X + 1)  /\ st X > 0}};;
+      X ::= X + 1
+      {{ fun st => st Y = fib (st X - 1) /\ st Z = fib (st X) /\ st X > 0}}
+    END
+    {{ fun st => st Y = fib (st X - 1) /\ st Z = fib (st X) /\ st X > 0 /\ st X = n + 1 }} ->>
+    {{ fun st => st Y = fib n }}.
+
+
 
 Theorem dfib_correct : forall n,
   dec_correct (dfib n).
-(* 请在此处解答 *) Admitted.
+Proof.
+  intros. verify.
+  - replace (st X + 1 - 1) with (st X) by lia. reflexivity.
+  - replace (st X - 1) with (pred (st X)) by lia.
+    apply fib_eqn. assumption.
+  - replace (n + 1 - 1) with (n) by lia. reflexivity.
+Qed.
 (** [] *)
 
 Close Scope dcom_scope.

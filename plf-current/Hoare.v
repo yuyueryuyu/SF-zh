@@ -6,7 +6,7 @@ From Coq Require Import Bool.Bool.
 From Coq Require Import Arith.Arith.
 From Coq Require Import Arith.EqNat.
 From Coq Require Import Arith.PeanoNat. Import Nat.
-From Coq Require Import omega.Omega.
+From Coq Require Import Lia.
 From PLF Require Import Imp.
 
 (** 在_'逻辑基础'_（_'软件基础'_ 的第一章) 中，
@@ -91,16 +91,26 @@ Definition Assertion := state -> Prop.
 
 Module ExAssertions.
 Definition as1 : Assertion := fun st => st X = 3.
+(* 在当前内存映射状态中， X映射为3 *)
 Definition as2 : Assertion := fun st => st X <= st Y.
+(* 在当前内存映射状态中， X映射的值小于等于Y映射的值 *)
 Definition as3 : Assertion :=
   fun st => st X = 3 \/ st X <= st Y.
+(* 在当前内存映射状态中， X映射为3 或者 X映射的值小于等于Y映射的值 *)
 Definition as4 : Assertion :=
   fun st => st Z * st Z <= st X /\
             ~ (((S (st Z)) * (S (st Z))) <= st X).
+(* 在当前内存映射状态中， Z映射的值的平方 小于等于 X映射为的值 且
+  （Z映射的值+1）的平方不小于等于X映射的值   *)
 Definition as5 : Assertion :=
   fun st => st Z = max (st X) (st Y).
+(*
+  在当前内存映射状态中， Z映射的值等于X映射的值和Y映射的值之间的最大值
+*)
 Definition as6 : Assertion := fun st => True.
+(* 一个永远为真的关于内存状态的断言 *)
 Definition as7: Assertion := fun st => False.
+(* 一个永远为假的关于内存状态的断言 *)
 (* 请在此处解答 *)
 End ExAssertions.
 (** [] *)
@@ -255,20 +265,24 @@ Notation "{{ P }}  c  {{ Q }}" :=
     用中文重新表述下列霍尔三元组。
 
    1) {{True}} c {{X = 5}}
-
+c在任意状态下开始，如果c最终在一个状态停机，那么这个状态满足X = 5
    2) {{X = m}} c {{X = m + 5)}}
-
+c在满足X = m的状态开始，如果c最终在一个状态停机，那么这个状态满足X = m+5
    3) {{X <= Y}} c {{Y <= X}}
-
+c在满足X <= Y的状态开始，如果c最终在一个状态停机，那么这个状态满足Y <= X
    4) {{True}} c {{False}}
-
+c在任意条件的状态下开始，如果c最终在一个状态停机，那这个状态满足False条件
+也就是说，c从不停机
    5) {{X = m}}
       c
       {{Y = real_fact m}}
-
+c在满足X = m的状态开始，如果c最终在一个状态停机，那么这个状态满足
+Y = real_fact m
    6) {{X = m}}
       c
       {{(Z * Z) <= m /\ ~ (((S Z) * (S Z)) <= m)}}
+  c在满足X = m的状态开始，如果c最终在一个状态停机，那么这个状态满足
+(Z * Z) <= m /\ ~ (((S Z) * (S Z)) <= m)
 *)
 (* 请在此处解答
 
@@ -280,31 +294,108 @@ Notation "{{ P }}  c  {{ Q }}" :=
     关系是否为真？
 
    1) {{True}} X ::= 5 {{X = 5}}
-
+真
    2) {{X = 2}} X ::= X + 1 {{X = 3}}
-
+真
    3) {{True}} X ::= 5;; Y ::= 0 {{X = 5}}
-
+真
    4) {{X = 2 /\ X = 3}} X ::= 5 {{X = 0}}
-
+真
    5) {{True}} SKIP {{False}}
-
+假
    6) {{False}} SKIP {{True}}
-
+真
    7) {{True}} WHILE true DO SKIP END {{False}}
-
+真
    8) {{X = 0}}
         WHILE X = 0 DO X ::= X + 1 END
       {{X = 1}}
-
+真
    9) {{X = 1}}
         WHILE ~(X = 0) DO X ::= X + 1 END
       {{X = 100}}
-*)
+真
+      *)
 (* 请在此处解答
 
     [] *)
 
+Example hoare_ex1 : {{True}} X ::= 5 {{X = 5}}.
+Proof.
+  unfold hoare_triple. intros. inversion H; subst. 
+  simpl. apply t_update_eq.
+Qed.
+
+Example hoare_ex2 : {{X = 2}} X ::= X + 1 {{X = 3}}.
+Proof.
+  unfold hoare_triple. intros. inversion H; subst. 
+  simpl in *. rewrite H0. simpl. apply t_update_eq. 
+Qed.
+
+Example hoare_ex3 : {{True}} X ::= 5;; Y ::= 0 {{X = 5}}.
+Proof.
+  unfold hoare_triple. intros. inversion H; subst. 
+  simpl. inversion H3; subst. inversion H6; subst. 
+  simpl in *. rewrite t_update_permute. apply t_update_eq.
+  unfold X. unfold Y. intros contra. discriminate.
+Qed.
+
+Example hoare_ex4 : {{X = 2 /\ X = 3}} X ::= 5 {{X = 0}}.
+Proof.
+  unfold hoare_triple. intros. simpl in H0. exfalso.
+  destruct H0. rewrite H1 in H0. discriminate.
+Qed.
+
+Example hoare_ex5 : ~({{True}} SKIP {{False}}).
+Proof.
+  unfold hoare_triple. simpl. intros contra. 
+  apply (contra empty_st empty_st); try constructor; try reflexivity.
+Qed.
+
+Example hoare_ex6 : {{False}} SKIP {{True}}.
+Proof.
+  unfold hoare_triple. intros. simpl in *. exfalso; auto.
+Qed.
+
+Example hoare_ex7 : {{True}} WHILE true DO SKIP END {{False}}.
+Proof.
+  unfold hoare_triple. intros. simpl in *. 
+  remember (CWhile BTrue (SKIP)) as p.
+  induction H; try discriminate.
+  - injection Heqp as Hb Hc. rewrite Hb in H. simpl in H. discriminate.
+  - apply IHceval2. apply Heqp. 
+Qed.
+
+Example hoare_ex8 : {{X = 0}}
+        WHILE X = 0 DO X ::= X + 1 END
+      {{X = 1}}.
+Proof.
+  unfold hoare_triple. intros. inversion H; subst; simpl in *.
+  - apply eqb_neq in H5. exfalso. apply H5. auto.
+  - inversion H4; subst. simpl in *. rewrite H0 in H7. simpl in *.
+    inversion H7; subst. apply t_update_eq. 
+    simpl in H5. discriminate. 
+Qed.
+
+Example hoare_ex9 : {{X = 1}}
+        WHILE ~(X = 0) DO X ::= X + 1 END
+      {{X = 100}}.
+Proof.
+  unfold hoare_triple. intros.
+  assert(Hne: st X <> 0).
+  {
+    simpl in H0. rewrite H0. intros contra. discriminate.
+  }
+  clear H0.
+  remember (CWhile (~ X = 0) (X ::= X + 1)) as p.
+  induction H; try discriminate; injection Heqp as Hb Hc.
+  - subst. simpl in *. exfalso. apply Hne. apply negb_false_iff in H.
+    apply eqb_eq in H. apply H.
+  - subst. apply IHceval2; try reflexivity.
+    intros contra. inversion H0; subst. rewrite t_update_eq in contra.
+    simpl in contra. rewrite add_comm in contra. discriminate. 
+Qed.
+  
 (** 为了热身，这里有两个关于霍尔三元组的简单定理。
     （确保看懂了这些再继续。）*)
 
@@ -501,7 +592,19 @@ Proof.
    和 [assn_sub_ex2]），并且用 [hoare_asgn] 来证明它们。*)
 
 (* 请在此处解答 *)
+Theorem assn_sub_ex1: {{ (0 <= X /\ X <= 5) [X |-> 3] }}
+       X ::= 3
+       {{ 0 <= X /\ X <= 5 }}.
+Proof.
+  apply hoare_asgn.
+Qed.
 
+Theorem assn_sub_ex2: {{ (0 <= X /\ X <= 5) [X |-> 3] }}
+       X ::= 3
+       {{ 0 <= X /\ X <= 5 }}.
+Proof.
+  apply hoare_asgn.
+Qed.
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_hoare_asgn_examples : option (nat*string) := None.
 (** [] *)
@@ -520,6 +623,20 @@ Definition manual_grade_for_hoare_asgn_examples : option (nat*string) := None.
     反例应该包含一个使这个规则不能正确工作的 [a]。）*)
 
 (* 请在此处解答 *)
+Theorem hoare_asgn_wrong: exists (a: aexp), ~({{ True }}
+       X ::= a
+       {{ X = a }}).
+Proof.
+  exists (APlus (AId X) (ANum 1)).
+  unfold hoare_triple. intros contra.
+  simpl in contra. 
+  assert(Hcontra: (X!->1 ; X!->0) X = (X!->1 ; X!->0) X + 1 -> False).
+  {
+    simpl. rewrite t_update_eq. intros. discriminate.
+  }
+  apply Hcontra. apply contra with (X!->0); auto.
+  apply E_Ass. simpl. reflexivity.
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_hoare_asgn_wrong : option (nat*string) := None.
@@ -547,7 +664,13 @@ Theorem hoare_asgn_fwd :
   {{fun st => P (X !-> m ; st)
            /\ st X = aeval (X !-> m ; st) a }}.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. unfold hoare_triple. intros. destruct H0 as [H0 H1].
+  split.
+  - inversion H; subst. rewrite t_update_shadow.
+    rewrite t_update_same; auto.
+  - inversion H; subst. rewrite t_update_eq. 
+    rewrite t_update_shadow. rewrite t_update_same; auto.
+Qed. 
 (** [] *)
 
 (** **** 练习：2 星, advanced, optional (hoare_asgn_fwd_exists) 
@@ -570,7 +693,21 @@ Theorem hoare_asgn_fwd_exists :
                 st X = aeval (X !-> m ; st) a }}.
 Proof.
   intros a P.
-  (* 请在此处解答 *) Admitted.
+  unfold hoare_triple. intros.
+  inversion H; subst.
+  assert(Hex: exists x, st X = x).
+  {
+    destruct st eqn:Est.
+    - exists 0. reflexivity.
+    - exists (S s). reflexivity. 
+  }
+  destruct Hex.
+  exists x. split.
+  - rewrite t_update_shadow. rewrite <- H1. rewrite t_update_same.
+    assumption.
+  - rewrite t_update_shadow. rewrite t_update_eq. rewrite <- H1.
+    rewrite t_update_same. reflexivity.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -674,7 +811,7 @@ Proof.
   apply hoare_consequence_pre
     with (P' := (X < 5) [X |-> X + 1]).
   apply hoare_asgn.
-  intros st H. unfold assn_sub, t_update. simpl in *. omega.
+  intros st H. unfold assn_sub, t_update. simpl in *. lia.
 Qed.
 
 (** 最后，为了证明中的方便，我们有一个组合起来的缩放规则，可以让
@@ -807,6 +944,22 @@ Qed.
 
 (* 请在此处解答 *)
 
+Example assn_sub_ex1': {{ X + 1 <= 5 }}  X ::= X + 1  {{ X <= 5 }}.
+Proof.
+  eapply hoare_consequence_pre.
+  apply hoare_asgn.
+  unfold assn_sub. unfold t_update. 
+  intros st H. assumption.
+Qed.
+
+Example assn_sub_ex2': {{ 0 <= 3 /\ 3 <= 5 }}  X ::= 3  {{ 0 <= X /\ X <= 5 }}.
+Proof.
+  eapply hoare_consequence_pre.
+  apply hoare_asgn.
+  unfold assn_sub. unfold t_update. 
+  intros st H. assumption.
+Qed.
+
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_hoare_asgn_examples_2 : option (nat*string) := None.
 (** [] *)
@@ -824,7 +977,7 @@ Theorem hoare_skip : forall P,
      {{P}} SKIP {{P}}.
 Proof.
   intros P st st' H HP. inversion H. subst.
-  assumption.  Qed.
+  assumption.  Qed. 
 
 (* ================================================================= *)
 (** ** 顺序 *)
@@ -902,7 +1055,17 @@ Example hoare_asgn_example4 :
   X ::= 1;; Y ::= 2
   {{ (X = 1 /\ Y = 2)}}.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply hoare_seq with (Q := (X = 1) [X |-> X]).
+  - eapply hoare_consequence_pre.
+    apply hoare_asgn.
+    unfold assn_sub. unfold t_update. simpl.
+    intros st H. split; auto.
+  - eapply hoare_consequence_pre.
+    apply hoare_asgn.
+    unfold assn_sub; unfold t_update. simpl.
+    intros st H. reflexivity.
+Qed. 
+
 (** [] *)
 
 (** **** 练习：3 星, standard (swap_exercise) 
@@ -917,14 +1080,40 @@ Proof.
      因此你的证明可以从程序的末尾开始，逐步往程序开头进行。） *)
 
 Definition swap_program : com
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+  := (
+    Z ::= X ;;
+    X ::= Y ;;
+    Y ::= Z
+  ).
 
 Theorem swap_exercise :
   {{X <= Y}}
   swap_program
   {{Y <= X}}.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply hoare_seq with (Q := (X <= Y /\ Z = X) [Z |-> Z]).
+  - apply hoare_seq with (Q := (Z <= Y /\ X = Y) [X |-> X]).
+    + eapply hoare_consequence_pre.
+      apply hoare_asgn.
+      unfold assn_sub; unfold t_update.
+      simpl. intros st H.
+      destruct H as [H1 H2].
+      rewrite H2.
+      assumption.
+    + eapply hoare_consequence_pre.
+      apply hoare_asgn.
+      unfold assn_sub; unfold t_update.
+      simpl; intros st H.
+      split; auto.
+      destruct H as [H1 H2].
+      rewrite H2. auto.
+  - eapply hoare_consequence_pre.
+    apply hoare_asgn.
+    unfold assn_sub; unfold t_update.
+    simpl; intros st H.
+    split; auto.
+Qed.
+
 (** [] *)
 
 (** **** 练习：3 星, standard (hoarestate1) 
@@ -938,7 +1127,7 @@ Proof.
 *)
 
 (* 请在此处解答 *)
-
+(* 如果a包含X，那么X在X::=3语句中值被改变，表达式a的值也会改变，不再等于n *)
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_hoarestate1 : option (nat*string) := None.
 (** [] *)
@@ -1052,11 +1241,11 @@ Proof.
     unfold bassn, assn_sub, t_update, assert_implies.
     simpl. intros st [_ H].
     apply eqb_eq in H.
-    rewrite H. omega.
+    rewrite H. lia.
   - (* Else *)
     eapply hoare_consequence_pre. apply hoare_asgn.
     unfold assn_sub, t_update, assert_implies.
-    simpl; intros st _. omega.
+    simpl; intros st _. lia.
 Qed.
 
 (** **** 练习：2 星, standard (if_minus_plus) 
@@ -1071,7 +1260,19 @@ Theorem if_minus_plus :
   FI
   {{Y = X + Z}}.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply hoare_if.
+  - eapply hoare_consequence_pre.
+    apply hoare_asgn.
+    unfold assn_sub. unfold t_update.
+    simpl. intros st [H1 H2].
+    apply leb_iff in H2.
+    rewrite Arith_base.le_plus_minus_r_stt; auto.
+  - eapply hoare_consequence_pre.
+    apply hoare_asgn.
+    unfold assn_sub. unfold t_update.
+    simpl. intros st [H1 H2].
+    reflexivity.
+Qed.
 (** [] *)
 
 (* ----------------------------------------------------------------- *)
@@ -1145,7 +1346,13 @@ Inductive ceval : com -> state -> state -> Prop :=
       st  =[ c ]=> st' ->
       st' =[ WHILE b DO c END ]=> st'' ->
       st  =[ WHILE b DO c END ]=> st''
-(* 请在此处解答 *)
+  | E_If1True : forall st st' b c,
+      beval st b = true ->
+      st =[ c ]=> st' ->
+      st =[ IF1 b THEN c FI]=> st'
+  | E_If1False : forall st b c,
+      beval st b = false ->
+      st =[ IF1 b THEN c FI]=> st
 
   where "st '=[' c ']=>' st'" := (ceval c st st').
 
@@ -1167,6 +1374,18 @@ Notation "{{ P }}  c  {{ Q }}" := (hoare_triple P c Q)
 
 (* 请在此处解答 *)
 
+Theorem hoare_if1 : forall P Q (b: bexp) c, 
+  {{P /\ b}} c {{Q}} ->
+  {{P /\ ~b}} SKIP {{Q}} ->
+  {{P}} (IF1 b THEN c FI) {{Q}}.
+Proof.
+  intros. unfold hoare_triple.
+  intros. inversion H1; subst.
+  - apply (H st st'); auto.
+  - apply (H0 st' st'); constructor; auto.
+    apply bexp_eval_false; auto. 
+Qed. 
+
 (** 要拿到全部的分数，你还得证明一个定理 [hoare_if1_good] 指出你的规则足够精细，
     能够证明下列的霍尔三元组是成立的：
 
@@ -1180,13 +1399,85 @@ Notation "{{ P }}  c  {{ Q }}" := (hoare_triple P c Q)
 (** Hint: 提示，你的证明会用到其它证明规则。因为我们开了个新模组，你得把你用到
     的那些都拷到这来。*)
 
+
+Definition bassn b : Assertion :=
+  fun st => (beval st b = true).
+
+Coercion bassn : bexp >-> Assertion.
+
+Arguments bassn /.
+
+(** 下列是一些有关于 [bassn] 的有用的引理：*)
+
+Lemma bexp_eval_true : forall b st,
+  beval st b = true -> (bassn b) st.
+Proof.
+  intros b st Hbe.
+  unfold bassn. assumption.  Qed.
+
+Lemma bexp_eval_false : forall b st,
+  beval st b = false -> ~ ((bassn b) st).
+Proof.
+  intros b st Hbe contra.
+  unfold bassn in contra.
+  rewrite -> contra in Hbe. inversion Hbe.  Qed.
+
+Theorem hoare_consequence_pre : forall (P P' Q : Assertion) c,
+  {{P'}} c {{Q}} ->
+  P ->> P' ->
+  {{P}} c {{Q}}.
+Proof.
+  intros P P' Q c Hhoare Himp.
+  intros st st' Hc HP. apply (Hhoare st st').
+  assumption. apply Himp. assumption. Qed.
+
+Theorem hoare_consequence_post : forall (P Q Q' : Assertion) c,
+  {{P}} c {{Q'}} ->
+  Q' ->> Q ->
+  {{P}} c {{Q}}.
+Proof.
+  intros P Q Q' c Hhoare Himp.
+  intros st st' Hc HP.
+  apply Himp.
+  apply (Hhoare st st').
+  assumption. assumption. Qed.
+
+Theorem hoare_asgn : forall Q X a,
+  {{Q [X |-> a]}} X ::= a {{Q}}.
+Proof.
+  unfold hoare_triple.
+  intros Q X a st st' HE HQ.
+  inversion HE. subst.
+  unfold assn_sub in HQ. assumption.  Qed.
+
+Theorem hoare_skip : forall P,
+     {{P}} SKIP {{P}}.
+Proof.
+  intros P st st' H HP. inversion H. subst.
+  assumption.  Qed. 
+
 Lemma hoare_if1_good :
   {{ X + Y = Z }}
   (IF1 ~(Y = 0) THEN
     X ::= X + Y
   FI)
   {{ X = Z }}.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  apply hoare_if1.
+  - eapply hoare_consequence_pre. 
+    apply hoare_asgn.
+    unfold assn_sub. unfold t_update.
+    simpl. intros st [H1 H2]; auto.
+  - eapply hoare_consequence_pre. 
+    apply hoare_skip.
+    intros st [H1 H2]. simpl in H2.
+    apply not_true_is_false in H2.
+    apply negb_false_iff in H2.
+    apply eqb_eq in H2.
+    simpl in *. rewrite H2 in H1. 
+    lia.
+Qed.
+    
 
 End If1.
 
@@ -1293,11 +1584,11 @@ Proof.
   eapply hoare_consequence_pre.
   apply hoare_asgn.
   unfold bassn, assn_sub, assert_implies, t_update. simpl.
-    intros st [H1 H2]. apply leb_complete in H2. omega.
+    intros st [H1 H2]. apply leb_complete in H2. lia.
   unfold bassn, assert_implies. intros st [Hle Hb].
     simpl in Hb. destruct ((st X) <=? 2) eqn : Heqle.
     exfalso. apply Hb; reflexivity.
-    apply leb_iff_conv in Heqle. simpl in *. omega.
+    apply leb_iff_conv in Heqle. simpl in *. lia.
 Qed.
 (** 我们可以使用 WHILE 规则来证明下列的霍尔三元组。 *)
 
@@ -1391,6 +1682,15 @@ Inductive ceval : state -> com -> state -> Prop :=
       st  =[ c ]=> st' ->
       st' =[ WHILE b DO c END ]=> st'' ->
       st  =[ WHILE b DO c END ]=> st''
+  | E_RepeatFalse : forall st st' st'' c b,
+      beval st' b = false ->
+      st =[ c ]=> st' ->
+      st' =[ REPEAT c UNTIL b END ]=> st'' ->
+      st =[ REPEAT c UNTIL b END ]=> st''
+  | E_RepeatTrue : forall st st' c b,
+      beval st' b = true ->
+      st =[ c ]=> st' ->
+      st =[ REPEAT c UNTIL b END ]=> st'
 (* 请在此处解答 *)
 
 where "st '=[' c ']=>' st'" := (ceval st c st').
@@ -1416,13 +1716,42 @@ Definition ex1_repeat :=
 Theorem ex1_repeat_works :
   empty_st =[ ex1_repeat ]=> (Y !-> 1 ; X !-> 1).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply E_RepeatTrue.
+  - rewrite t_update_permute; auto.
+    intros contra. discriminate.
+  - apply E_Seq with (X!->1).
+    + apply E_Ass; auto.
+    + apply E_Ass; auto.
+Qed.
 
 (** 现在写出并证明一个定理 [hoare_repeat] 表达一个 [repeat]
     命令的合理证明规则。你可以把 [hoare_while] 当作一个模板，
     试着让你的规则尽可能地精确。 *)
 
 (* 请在此处解答 *)
+
+(*
+c ;;
+while ~b do c end
+*)
+
+Theorem hoare_repeat : forall P Q c (b: bexp),
+  {{P}} c {{(P /\ ~b) \/ (Q /\ b)}} ->
+  {{P}} (REPEAT c UNTIL b END) {{Q /\ b}}.
+Proof.
+  intros. intros st st' H1 H2.
+  remember (REPEAT c UNTIL b END) as p1.
+  induction H1; try discriminate; 
+  injection Heqp1 as Hc Hb; subst.
+  - intros. apply IHceval2; auto.
+    destruct (H st st'); auto.
+    + destruct H1; auto.
+    + simpl in H1. destruct H1 as [_ H1]. 
+      rewrite H1 in H0. discriminate.
+  - destruct (H st st'); auto.
+    destruct H3 as [_ H3]. simpl in H3.
+    rewrite H0 in H3. exfalso. apply H3. reflexivity.
+Qed.
 
 (** 要拿到全部的分数，请确保（非正式即可）你的规则可以用来证明以下
     的霍尔三元组成立。
@@ -1434,6 +1763,75 @@ Proof.
   UNTIL X = 0 END
   {{ X = 0 /\ Y > 0 }}
 *)
+Theorem hoare_consequence_pre : forall (P P' Q : Assertion) c,
+  {{P'}} c {{Q}} ->
+  P ->> P' ->
+  {{P}} c {{Q}}.
+Proof.
+  intros P P' Q c Hhoare Himp.
+  intros st st' Hc HP. apply (Hhoare st st').
+  assumption. apply Himp. assumption. Qed.
+
+Theorem hoare_consequence_post : forall (P Q Q' : Assertion) c,
+  {{P}} c {{Q'}} ->
+  Q' ->> Q ->
+  {{P}} c {{Q}}.
+Proof.
+  intros P Q Q' c Hhoare Himp.
+  intros st st' Hc HP.
+  apply Himp.
+  apply (Hhoare st st').
+  assumption. assumption. Qed.
+
+Theorem hoare_seq : forall P Q R c1 c2,
+     {{Q}} c2 {{R}} ->
+     {{P}} c1 {{Q}} ->
+     {{P}} c1;;c2 {{R}}.
+Proof.
+  intros P Q R c1 c2 H1 H2 st st' H12 Pre.
+  inversion H12; subst.
+  apply (H1 st'0 st'); try assumption.
+  apply (H2 st st'0); assumption. Qed.
+
+Theorem hoare_asgn : forall Q X a,
+  {{Q [X |-> a]}} X ::= a {{Q}}.
+Proof.
+  unfold hoare_triple.
+  intros Q X a st st' HE HQ.
+  inversion HE. subst.
+  unfold assn_sub in HQ. assumption.  Qed.
+
+Example ex2_repeat: {{ X > 0 }}
+  REPEAT
+    Y ::= X;;
+    X ::= X - 1
+  UNTIL X = 0 END
+  {{ X = 0 /\ Y > 0 }}.
+Proof.
+  eapply hoare_consequence_post.
+  apply hoare_repeat with (Q:=(X = 0 /\ Y > 0) [X |-> X]).
+  - apply hoare_seq with ((X > 0 /\ Y > 0) [X |-> X]).
+    + eapply hoare_consequence_pre.
+      apply hoare_asgn.
+      unfold assn_sub.
+      unfold t_update.
+      simpl. intros st H. 
+      destruct (eqb (st X) 1) eqn: Ex.
+      * rewrite eqb_eq in *. right. lia.  
+      * rewrite eqb_neq in Ex. 
+        rewrite not_true_iff_false.
+        rewrite eqb_neq. left; lia. 
+    + eapply hoare_consequence_pre.
+      apply hoare_asgn.
+      unfold assn_sub, t_update. simpl.
+      intros st H. lia.
+  - simpl. intros st H.
+    rewrite eqb_eq in H.
+    destruct H. destruct H.
+    rewrite t_update_eq in H. simpl in H.
+    rewrite t_update_neq in H1. lia.
+    unfold X, Y. intros contra. discriminate.
+Qed.
 
 End RepeatExercise.
 
@@ -1565,13 +1963,15 @@ Proof.
     证明此规则是正确的。*)
 
 Definition havoc_pre (X : string) (Q : Assertion) : Assertion
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+  := fun st => forall (n: nat), Q [X |-> n] st.
 
 Theorem hoare_havoc : forall (Q : Assertion) (X : string),
   {{ havoc_pre X Q }} HAVOC X {{ Q }}.
 Proof.
-  (* 请在此处解答 *) Admitted.
-
+  intros. intros st st' H1 H2. unfold havoc_pre in H2.
+  inversion H1; subst. simpl in H2. apply (H2 n).
+Qed.    
+Search(total_map).
 (** Complete the following proof without changing any of the provided
     commands. If you find that it can't be completed, your definition of
     [havoc_pre] is probably too strong. Find a way to relax it so that
@@ -1583,7 +1983,10 @@ Proof.
   intros P X. eapply hoare_consequence_pre.
   - apply hoare_havoc.
   - unfold assert_implies, assn_sub.
-    (* 请在此处解答 *) Admitted.
+    intros. simpl. unfold havoc_pre. unfold assn_sub.
+    simpl. intros. exists (st X). simpl. rewrite t_update_shadow.
+    rewrite t_update_same. auto.
+Qed.
 
 End Himp.
 (** [] *)
@@ -1706,13 +2109,32 @@ Notation "{{ P }}  c  {{ Q }}" :=
 Theorem assert_assume_differ : exists (P:Assertion) b (Q:Assertion),
        ({{P}} ASSUME b {{Q}})
   /\ ~ ({{P}} ASSERT b {{Q}}).
-(* 请在此处解答 *) Admitted.
+Proof.
+  exists True. exists false. exists True.
+  split.
+  - simpl. intros st r H1 H2. inversion H1; subst. discriminate.
+  - simpl. intros contra. unfold hoare_triple in contra.
+    assert(exists st, st =[ASSERT BFalse]=> RNormal st).
+    {
+      destruct (contra empty_st (RError)); auto.
+      apply E_AssertFalse. auto.
+      destruct H. discriminate.
+    }
+    destruct H.
+    inversion H; subst. discriminate.
+Qed.
 
 Theorem assert_implies_assume : forall P b Q,
      ({{P}} ASSERT b {{Q}})
   -> ({{P}} ASSUME b {{Q}}).
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros. intros st r H1 H2. 
+  inversion H1; subst.
+  exists st. split; auto.
+  destruct (H st (RNormal st)); try constructor; auto.
+  destruct H0. injection H0 as H0; subst; auto.
+Qed.
+
 
 (** 你的任务是为 [ASSERT] 和 [ASSUME] 创建霍尔规则，并且用它们证明
     一个小程序是正确的。把你的规则起名为 [hoare_assert] 和 [hoare_assume]。
@@ -1773,6 +2195,23 @@ Qed.
 (**  把你提出的霍尔规则，[hoare_assert] 和 [hoare_assume] 写在下面。*)
 
 (* 请在此处解答 *)
+Theorem hoare_assert : forall P (b: bexp), 
+    {{P /\ b}} ASSERT b {{P /\ b}}.
+Proof.
+  intros. intros st r H1 H2.
+  inversion H1; subst.
+  - exists st; auto.
+  - destruct H2 as [_ H2]. simpl in H2. rewrite H0 in H2. 
+    discriminate. 
+Qed.
+
+Theorem hoare_assume : forall P (b: bexp),
+  {{P}} ASSUME b {{P /\ b}}.
+Proof.
+  intros. intros st r H1 H2.
+  inversion H1; subst.
+  exists st; auto.
+Qed.
 
 (** 下列是其它证明规则（用来检查是否合理）*)
 Theorem hoare_skip : forall P,
@@ -1836,7 +2275,22 @@ Example assert_assume_example:
   ASSERT (X = 2)
   {{True}}.
 Proof.
-(* 请在此处解答 *) Admitted.
+  apply hoare_seq with ((X = 1) [X |-> X]); 
+    unfold assn_sub, t_update; simpl.
+  apply hoare_seq with ((X = 2) [X |-> X]); 
+    unfold assn_sub, t_update; simpl.
+  - apply hoare_consequence_pre with (fun st : state => assert True st /\ bassn (X = 2) st).
+    eapply hoare_consequence_post. apply hoare_assert.
+    + simpl. intros st H1. reflexivity.
+    + simpl. intros st H1. split; auto.
+      apply eqb_eq; auto.
+  - eapply hoare_consequence_pre. apply hoare_asgn.
+    intros st H. unfold assn_sub, t_update; simpl.
+    lia.
+  - eapply hoare_consequence_post. apply hoare_assume.
+    intros st H. simpl in *. destruct H.
+    apply eqb_eq in H0; auto.
+Qed.
 
 End HoareAssertAssume.
 (** [] *)

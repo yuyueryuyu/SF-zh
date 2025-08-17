@@ -8,10 +8,10 @@ I am currently working on Vol 2: PLF.
 | LF 章节 | 进度 | PLF 章节 | 进度 |
 | --- | --- | --- | --- |
 | Basics | √ | Equiv | √ |
-| Induction | √ | ... | × |
-| Lists | √ |
-| Poly | √ |
-| Tactics | √ |
+| Induction | √ | Hoare | √ |
+| Lists | √ | Hoare2 | √ (except improve_dcom & implement_dcom)|
+| Poly | √ | Smallstep | √ |
+| Tactics | √ | HoareAsLogic | √ |
 | Logic | √ |
 | IndProp | √ |
 | Maps | √ |

@@ -4,7 +4,7 @@ Set Warnings "-notation-overridden,-parsing".
 From Coq Require Import Arith.Arith.
 From Coq Require Import Arith.EqNat.
 From Coq Require Import Init.Nat.
-From Coq Require Import omega.Omega.
+From Coq Require Import Lia.
 From Coq Require Import Lists.List.
 Import ListNotations.
 From PLF Require Import Maps.
@@ -162,7 +162,7 @@ Example test_step_2 :
           (C 2)
           (C (0 + 3))).
 Proof.
-  (* 请在此处解答 *) Admitted.
+repeat apply ST_Plus2. apply ST_PlusConstConst. Qed.  
 (** [] *)
 
 End SimpleArith1.
@@ -385,7 +385,23 @@ Inductive step : tm -> tm -> Prop :=
 Theorem step_deterministic :
   deterministic step.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  unfold deterministic. intros.
+  generalize dependent y2.
+  induction H.
+  - intros. inversion H0; auto.
+    + inversion H3.
+    + inversion H4.
+  - intros. inversion H0; subst.
+    + inversion H.
+    + apply IHstep in H4. rewrite H4. auto.
+    + inversion H3; subst. inversion H.
+  - intros. inversion H; subst. 
+    inversion H1; subst.
+    + inversion H0.
+    + inversion H5.
+    + apply IHstep in H6. rewrite H6. auto.
+Qed.
+  
 (** [] *)
 
 (* ================================================================= *)
@@ -516,7 +532,15 @@ Inductive step : tm -> tm -> Prop :=
 Lemma value_not_same_as_normal_form :
   exists v, value v /\ ~ normal_form step v.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  exists (P (C 0) (C 0)).
+  split.
+  - apply v_funny.
+  - intros contra. unfold normal_form in contra.
+    apply contra. exists (C 0).
+    apply ST_PlusConstConst.
+Qed.
+  
+  
 End Temp1.
 
 (** [] *)
@@ -550,7 +574,14 @@ Inductive step : tm -> tm -> Prop :=
 Lemma value_not_same_as_normal_form :
   exists v, value v /\ ~ normal_form step v.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  exists (C 0).
+  split.
+  - apply v_const.
+  - intros contra. apply contra.
+    exists (P (C 0) (C 0)).
+    apply ST_Funny.
+Qed.
+  
 
 End Temp2.
 (** [] *)
@@ -582,7 +613,13 @@ Inductive step : tm -> tm -> Prop :=
 Lemma value_not_same_as_normal_form :
   exists t, ~ value t /\ normal_form step t.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  exists (P (C 0) (P (C 0) (C 0))).
+  split.
+  - intros contra.
+    inversion contra.
+  - intros contra. destruct contra.
+    inversion H; subst. inversion H3.
+Qed.
 
 End Temp3.
 (** [] *)
@@ -626,6 +663,11 @@ Definition bool_step_prop1 :=
   fls --> fls.
 
 (* 请在此处解答 *)
+Example bool_step_prop1_not_provable :
+  ~ bool_step_prop1.
+Proof.
+  intros contra. inversion contra.
+Qed.
 
 Definition bool_step_prop2 :=
      test
@@ -635,7 +677,11 @@ Definition bool_step_prop2 :=
   -->
      tru.
 
-(* 请在此处解答 *)
+Example bool_step_prop2_not_provable :
+  ~(bool_step_prop2).
+Proof.
+  intros contra. inversion contra.
+Qed.
 
 Definition bool_step_prop3 :=
      test
@@ -650,6 +696,13 @@ Definition bool_step_prop3 :=
 
 (* 请在此处解答 *)
 
+Example bool_step_prop3_provable :
+  bool_step_prop3.
+Proof.
+  apply ST_If.
+  apply ST_IfTrue.
+Qed.
+
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_smallstep_bools : option (nat*string) := None.
 (** [] *)
@@ -661,14 +714,35 @@ Definition manual_grade_for_smallstep_bools : option (nat*string) := None.
 Theorem strong_progress : forall t,
   value t \/ (exists t', t --> t').
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. induction t.
+  - left. apply v_tru.
+  - left. apply v_fls.
+  - right. destruct IHt1.
+    + inversion H; subst.
+      * exists t2. apply ST_IfTrue.
+      * exists t3. apply ST_IfFalse.
+    + destruct H. exists (test x t2 t3). apply ST_If.
+      apply H.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard, optional (step_deterministic)  *)
 Theorem step_deterministic :
   deterministic step.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  unfold deterministic.
+  intros. generalize dependent y2.
+  induction H.
+  - intros. inversion H0; auto; subst.
+    + inversion H4.
+  - intros. inversion H0; auto; subst.
+    + inversion H4.
+  - intros. inversion H0; subst.
+    + inversion H.
+    + inversion H.
+    + apply IHstep in H5.
+      rewrite H5. auto.
+Qed.
 (** [] *)
 
 Module Temp5.
@@ -700,7 +774,8 @@ Inductive step : tm -> tm -> Prop :=
   | ST_If : forall t1 t1' t2 t3,
       t1 --> t1' ->
       test t1 t2 t3 --> test t1' t2 t3
-  (* 请在此处解答 *)
+  | ST_ShortCircuit: forall t1 t2,
+      test t1 t2 t2 --> t2
 
   where " t '-->' t' " := (step t t').
 
@@ -715,7 +790,8 @@ Definition bool_step_prop4 :=
 Example bool_step_prop4_holds :
   bool_step_prop4.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply ST_ShortCircuit.
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, standard, optional (properties_of_altered_step) 
@@ -724,20 +800,55 @@ Proof.
     在我们添加了 [ST_ShortCircuit] 以后……
 
     - [step] 关系是否仍然是确定的？请回答是或否，并简要解释（一句话即可）你的答案。
-
+      No. 通过ST_If规约和通过ST_ShortCircuit规约会得到不同的结果
       可选：在 Coq 中证明你的答案。*)
+Theorem altered_step_not_deterministic : 
+  ~(deterministic step).
+Proof.
+  unfold deterministic.
+  intros contra.
+  assert(H1: (test (test tru tru tru) tru tru) --> tru).
+  {
+    apply ST_ShortCircuit.
+  }
+  assert(H2: (test (test tru tru tru) tru tru) --> test tru tru tru).
+  {
+    apply ST_If. apply ST_IfTrue.
+  }
+  apply (contra (test (test tru tru tru) tru tru) 
+                    (tru) 
+                    (test tru tru tru)) in H1; auto.
+  discriminate.
+Qed.
 
 (* 请在此处解答
    - 强可进性是否成立？请回答是或否，并简要解释（一句话即可）你的答案。
-
+    Yes. 无论怎么添加，总是要么可以规约，要么不可规约
      可选：在 Coq 中证明你的答案。
 *)
+
+Theorem altered_step_strong_progress: forall t,
+  value t \/ (exists t', t --> t').
+Proof.
+  intros. induction t.
+  - left. apply v_tru.
+  - left. apply v_fls.
+  - right. destruct IHt1.
+    + inversion H; subst.
+      * exists t2. apply ST_IfTrue.
+      * exists t3. apply ST_IfFalse.
+    + destruct H. exists (test x t2 t3). apply ST_If.
+      apply H.
+Qed.
+
 
 (* 请在此处解答
    - 一般来说，如果从原始的单步关系中拿掉一两个构造子，能否使强可进性不再成立？
      请回答是或否，并简要解释（一句话即可）你的答案。
-
-(* 请在此处解答 *)
+  
+(* 请在此处解答
+可以，比如把IfTrue拿掉，这样test tru tru tru就不可以继续被规约，但同时也不是value
+*)
 *)
 (** [] *)
 
@@ -870,7 +981,8 @@ Qed.
 Lemma test_multistep_2:
   C 3 -->* C 3.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply multi_refl.
+Qed.
 (** [] *)
 
 (** **** 练习：1 星, standard, optional (test_multistep_3)  *)
@@ -879,7 +991,8 @@ Lemma test_multistep_3:
    -->*
       P (C 0) (C 3).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply multi_refl.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard (test_multistep_4)  *)
@@ -894,7 +1007,16 @@ Lemma test_multistep_4:
         (C 0)
         (C (2 + (0 + 3))).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  eapply multi_step.
+  - apply ST_Plus2. apply v_const.
+    apply ST_Plus2. apply v_const.
+    apply ST_PlusConstConst.
+  - eapply multi_step.
+    + apply ST_Plus2. apply v_const.
+      apply ST_PlusConstConst.
+    + apply multi_refl.
+Qed.
+      
 (** [] *)
 
 (* ================================================================= *)
@@ -922,7 +1044,14 @@ Proof.
   inversion P1 as [P11 P12]; clear P1.
   inversion P2 as [P21 P22]; clear P2.
   generalize dependent y2.
-  (* 请在此处解答 *) Admitted.
+  induction P11.
+  - intros. inversion P21; subst; auto.
+    exfalso. apply P12. exists y. auto.
+  - intros. inversion P21; subst.
+    + exfalso. apply P22. exists y. apply H.
+    + apply (step_deterministic x y0) in H; auto. subst.
+      apply IHP11; auto.
+Qed.  
 (** [] *)
 
 (** 确实，这个语言中还具备更强的性质（尽管不是所有语言都具备）：
@@ -956,7 +1085,12 @@ Lemma multistep_congr_2 : forall t1 t2 t2',
      t2 -->* t2' ->
      P t1 t2 -->* P t1 t2'.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. inversion H; subst. induction H0.
+  - apply multi_refl.
+  - apply multi_step with (P (C n) y).
+    apply ST_Plus2; auto.
+    auto.
+Qed. 
 (** [] *)
 
 (** 使用这些引理，证明的主体是直接进行归纳。
@@ -1019,6 +1153,7 @@ Qed.
     好奇这两种定义是否是等价的！他们确实是，尽管需要一点工作来证明它。
     具体细节留做了练习。*)
 
+
 (** **** 练习：3 星, standard (eval__multistep)  *)
 Theorem eval__multistep : forall t n,
   t ==> n -> t -->* C n.
@@ -1051,7 +1186,23 @@ Theorem eval__multistep : forall t n,
     自反性，传递性，及其蕴含了 [-->]。 *)
 
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. induction H.
+  - apply multi_refl.
+  - assert(H': P t1 t2 -->* P (C n1) t2).
+    {
+      apply multistep_congr_1. assumption.
+    }
+    assert(H'': P (C n1) t2 -->* P (C n1) (C n2)).
+    {
+      apply multistep_congr_2; auto. constructor.
+    }
+    apply multi_trans with (x := P t1 t2) in H''; auto.
+    assert(H''': P (C n1) (C n2) -->* C (n1 + n2)).
+    { 
+      eapply multi_step. apply ST_PlusConstConst. apply multi_refl.
+    }
+    apply multi_trans with (x := P t1 t2) in H'''; auto.
+Qed. 
 (** [] *)
 
 (** **** 练习：3 星, advanced (eval__multistep_inf) 
@@ -1059,6 +1210,16 @@ Proof.
     请为 [eval__multi_step] 写出详细的非形式化证明。
 
 (* 请在此处解答 *)
+对t ==> n进行归纳，当t = C n时，由自反性显然成立；
+否则当t = P t1 t2的时候，假设t1 -->* n1 t2 -->* n2
+要证明t -->* C(n1 + n2)
+由引理可以证明
+P t1 t2 -->* P (C n1) t2
+P (C n1) t2 -->* P (C n1) (C n2)
+由单步也是多步的一种，可以证明
+P (C n1) (C n2) -->* C (n1 + n2)
+由传递性，可以证明
+P t1 t2 -->* C (n1 + n2)
 *)
 
 (* 请勿修改下面这一行： *)
@@ -1074,8 +1235,22 @@ Lemma step__eval : forall t t' n,
      t  ==> n.
 Proof.
   intros t t' n Hs. generalize dependent n.
-  (* 请在此处解答 *) Admitted.
+  induction Hs.
+  - intros. inversion H; subst. apply E_Plus; constructor.
+  - intros. inversion H; subst. apply E_Plus.
+    + apply IHHs. assumption.
+    + assumption.
+  - intros. inversion H0; subst. apply E_Plus; auto.
+Qed. 
 (** [] *)
+
+Lemma weak_multistep__eval : forall t n,
+  t -->* C n -> t ==> n.
+Proof.
+  intros. remember (C n) as t'. induction H.
+  - subst. apply E_Const.
+  - apply step__eval with y; auto.
+Qed.
 
 (** 一旦正确地表述了小步归约蕴含了大步求值的事实，它会很容易被证明。
 
@@ -1088,7 +1263,14 @@ Proof.
 Theorem multistep__eval : forall t t',
   normal_form_of t t' -> exists n, t' = C n /\ t ==> n.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. unfold normal_form_of in H.
+  unfold step_normal_form in H.
+  destruct H as [H1 H2].
+  apply nf_is_value in H2.
+  inversion H2.
+  exists n. split; auto. subst.
+  apply weak_multistep__eval; auto.
+Qed.
 (** [] *)
 
 (* ================================================================= *)
@@ -1099,11 +1281,25 @@ Proof.
     请回忆一下我们还通过函数 [evalF] 定义了对项的大步求值。请证明它等价于其他语义。
     （提示：我刚刚证明了 [eval] 和 [multistep] 是等价的，因此逻辑上讲你可以任意
     选择证明哪个。尽管有一个要比另一个简单！） *)
+Theorem evalF_eval_self : forall t, t ==> evalF t.
+Proof.
+  intros. induction t.
+  - simpl. apply E_Const.
+  - simpl. apply E_Plus; auto.
+Qed.
 
 Theorem evalF_eval : forall t n,
   evalF t = n <-> t ==> n.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros t. induction t.
+  - split; intros.
+    + simpl in *; subst. apply E_Const.
+    + simpl in *. inversion H; subst. reflexivity.
+  - intros. split; intros.
+    + simpl in H. rewrite <- H. apply E_Plus; apply evalF_eval_self.
+    + simpl. inversion H; subst. apply IHt1 in H2. apply IHt2 in H4.
+      rewrite H2. rewrite H4. reflexivity.
+Qed.   
 (** [] *)
 
 (** **** 练习：4 星, standard (combined_properties) 
@@ -1157,6 +1353,37 @@ Inductive step : tm -> tm -> Prop :=
 
 (* 请在此处解答 *)
 
+Theorem step_deterministic : deterministic step.
+Proof.
+  unfold deterministic. intros.
+  generalize dependent y2.
+  induction H; intros.
+  - inversion H0; subst; auto; try solve_by_invert.
+  - inversion H0; subst; try solve_by_invert.
+    + apply IHstep in H4.
+      rewrite H4. reflexivity.
+    + inversion H3; subst; try solve_by_invert.
+  - inversion H; subst. inversion H1; subst; try solve_by_invert.
+    + apply IHstep in H6. rewrite H6. reflexivity.
+    + inversion H1; try solve_by_invert.
+      apply IHstep in H6. rewrite H6. auto.
+    + inversion H1; try solve_by_invert.
+      apply IHstep in H6. rewrite H6. auto.
+  - inversion H0; subst; auto. inversion H4.
+  - inversion H0; subst; auto. inversion H4.
+  - inversion H0; subst; auto; try solve_by_invert.
+    apply IHstep in H5. rewrite H5. auto.
+Qed.
+
+(** 强可进性： 不成立，因为存在P tru tru 不是value也不能继续规约 *) 
+Theorem not_strong_progress : 
+  exists t, ~(value t) /\ forall t', ~(t --> t').
+Proof.
+  exists (P tru tru).
+  split. 
+  - intros contra. inversion contra.
+  - intros. intros contra. inversion contra; subst; solve_by_invert.
+Qed. 
 End Combined.
 
 (* 请勿修改下面这一行： *)
@@ -1463,7 +1690,25 @@ Lemma par_body_n__Sn : forall n st,
   st X = n /\ st Y = 0 ->
   par_loop / st -->* par_loop / (X !-> S n ; st).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. destruct H as [H1 H2].
+  eapply multi_step. apply CS_Par2. apply CS_While.
+  eapply multi_step. apply CS_Par2. apply CS_IfStep.
+  apply BS_Eq1. apply AS_Id.
+  eapply multi_step. apply CS_Par2. apply CS_IfStep.
+  apply BS_Eq.
+  eapply multi_step. apply CS_Par2. rewrite H2. simpl.
+  apply CS_IfTrue. 
+  eapply multi_step. apply CS_Par2. apply CS_SeqStep.
+  apply CS_AssStep. apply AS_Plus1. apply AS_Id.
+  eapply multi_step. apply CS_Par2. apply CS_SeqStep.
+  apply CS_AssStep. apply AS_Plus.
+  eapply multi_step. apply CS_Par2. apply CS_SeqStep.
+  apply CS_Ass.
+  eapply multi_step. apply CS_Par2. apply CS_SeqFinish.
+  unfold par_loop. rewrite Nat.add_comm. simpl. rewrite H1.
+  apply multi_refl.
+Qed.
+  
 (** [] *)
 
 (** **** 练习：3 星, standard, optional (par_body_n)  *)
@@ -1472,7 +1717,25 @@ Lemma par_body_n : forall n st,
   exists st',
     par_loop / st -->*  par_loop / st' /\ st' X = n /\ st' Y = 0.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. destruct H as [H1 H2].
+  exists (Y !-> 0 ; X !-> n; st).
+  split; try apply t_update_eq; auto.
+  induction n.
+  - rewrite <- H1. 
+    rewrite t_update_same.
+    rewrite H1. rewrite <- H2.
+    rewrite t_update_same.
+    apply multi_refl.
+  - assert(Heq: (Y !-> 0; X !-> S n; st) = (X !-> S n; Y !-> 0; X !-> n; st)).
+    {
+      rewrite t_update_permute with (v1:= S n). 
+      rewrite t_update_shadow. reflexivity.
+      unfold X, Y. intros contra. discriminate. 
+    }
+    apply multi_trans with (y := (par_loop , (Y !-> 0; X !-> n; st))); auto.
+    rewrite Heq. apply par_body_n__Sn.
+    split; auto.
+Qed.
 (** [] *)
 
 (** ……上面的循环可以在 [X] 为任何值时退出。 *)
@@ -1540,13 +1803,38 @@ Definition stack_multistep st := multi (stack_step st).
     我们现在想要证明堆栈机上 [s_compile] 函数的正确性。
 
     请根据堆栈机的小步语义陈述编译器正确性的定义，并证明它。 *)
+Fixpoint s_compile (e : aexp) : list sinstr :=
+  match e with 
+  | ANum n => [SPush n]
+  | AId x => [SLoad x]
+  | APlus a1 a2 => s_compile a1 ++ s_compile a2 ++ [SPlus]
+  | AMinus a1 a2 => s_compile a1 ++ s_compile a2 ++ [SMinus]
+  | AMult a1 a2 => s_compile a1 ++ s_compile a2 ++ [SMult]
+  end.
 
-Definition compiler_is_correct_statement : Prop
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Definition compiler_is_correct_statement : Prop :=
+  forall st e p stk, stack_multistep st ((s_compile e) ++ p, stk)  (p, (aeval st e) :: stk).
 
 Theorem compiler_is_correct : compiler_is_correct_statement.
 Proof.
-(* 请在此处解答 *) Admitted.
+  intros st e. generalize dependent st. induction e.
+  - intros. simpl. eapply multi_step.
+    apply SS_Push. apply multi_refl.
+  - intros. simpl. eapply multi_step.
+    apply SS_Load. apply multi_refl.
+  - intros. simpl. apply multi_trans with ((s_compile e2 ++ [SPlus] ++ p, (aeval st e1) :: stk)).
+    + rewrite <- app_assoc. rewrite <- app_assoc. apply IHe1.
+    + apply multi_trans with ((SPlus :: p, (aeval st e2) :: (aeval st e1) :: stk)).
+      apply IHe2. eapply multi_step. apply SS_Plus. apply multi_refl.
+  - intros. simpl. apply multi_trans with ((s_compile e2 ++ [SMinus] ++ p, (aeval st e1) :: stk)).
+    + rewrite <- app_assoc. rewrite <- app_assoc. apply IHe1.
+    + apply multi_trans with ((SMinus :: p, (aeval st e2) :: (aeval st e1) :: stk)).
+      apply IHe2. eapply multi_step. apply SS_Minus. apply multi_refl.
+  - intros. simpl. apply multi_trans with ((s_compile e2 ++ [SMult] ++ p, (aeval st e1) :: stk)).
+    + rewrite <- app_assoc. rewrite <- app_assoc. apply IHe1.
+    + apply multi_trans with ((SMult :: p, (aeval st e2) :: (aeval st e1) :: stk)).
+      apply IHe2. eapply multi_step. apply SS_Mult. apply multi_refl.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -1597,7 +1885,7 @@ Tactic Notation "print_goal" :=
 
 Tactic Notation "normalize" :=
   repeat (print_goal; eapply multi_step ;
-            [ (eauto 10; fail) | (instantiate; simpl)]);
+            [ (eauto 10; fail) | simpl]);
   apply multi_refl.
 
 Example step_example1'' :
@@ -1634,7 +1922,9 @@ Theorem normalize_ex : exists e',
   (P (C 3) (P (C 2) (C 1)))
   -->* e' /\ value e'.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  eapply ex_intro. split. normalize. apply v_const.
+Qed.
+  
 (** [] *)
 
 (** **** 练习：1 星, standard, optional (normalize_ex') 
@@ -1645,7 +1935,9 @@ Theorem normalize_ex' : exists e',
   (P (C 3) (P (C 2) (C 1)))
   -->* e' /\ value e'.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply ex_intro with (C 6). split. normalize. apply v_const.
+Qed.
+  
 (** [] *)
 
 (* 2022-03-14 05:28:22 (UTC+00) *)

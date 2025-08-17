@@ -104,7 +104,16 @@ Print sample_proof.
 Theorem hoare_proof_sound : forall P c Q,
   hoare_proof P c Q -> {{P}} c {{Q}}.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. induction X.
+  - apply hoare_skip.
+  - apply hoare_asgn.
+  - eapply hoare_seq. apply IHX2. apply IHX1.
+  - apply hoare_if; auto.
+  - apply hoare_while; auto.
+  - apply hoare_consequence_pre with P'.
+    apply hoare_consequence_post with Q'.
+    assumption. assumption. assumption.
+Qed. 
 (** [] *)
 
 (** 我们也可以使用Coq的推理工具来证明关于霍尔逻辑的元定理。例如，下述是我们在
@@ -210,14 +219,18 @@ Definition wp (c:com) (Q:Assertion) : Assertion :=
 
 Theorem wp_is_precondition : forall c Q,
   {{wp c Q}} c {{Q}}.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  intros. intros st st' H1 H2. unfold wp in H2. apply H2. apply H1.
+Qed.
 (** [] *)
 
 (** **** 练习：1 星, standard (wp_is_weakest)  *)
 
 Theorem wp_is_weakest : forall c Q P',
    {{P'}} c {{Q}} -> forall st, P' st -> wp c Q st.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  intros. unfold wp. intros. apply (H st); auto.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard (wp_invariant)  *)
@@ -228,7 +241,10 @@ Proof. (* 请在此处解答 *) Admitted.
 Lemma wp_invariant : forall b c Inv Q,
     Inv = wp (WHILE b DO c END) Q
     -> {{ fun st => Inv st /\ bassn b st }} c {{ Inv }}.
-Proof. (* 请在此处解答 *) Admitted.
+Proof. 
+  intros. subst. intros st st' H1 H2. destruct H2 as [H2 H3].
+  unfold wp in *. intros. apply H2. apply E_WhileTrue with st'; auto.
+Qed.
 (** [] *)
 
 (** 以下辅助引理在接下来的练习中会很有用。 *)
@@ -265,7 +281,23 @@ Proof.
        intros st st' E1 H. unfold wp. intros st'' E2.
          eapply HT. econstructor; eassumption. assumption.
      eapply IHc2. intros st st' E1 H. apply H; assumption.
-  (* 请在此处解答 *) Admitted.
+  - apply H_If.
+    + simpl. apply IHc1. intros st st' H1 H2. 
+      destruct H2 as [H2 H3]. apply (HT st).
+      * apply E_IfTrue; auto.
+      * assumption.
+    + simpl. apply IHc2. intros st st' H1 H2.
+      destruct H2 as [H2 H3]. apply Bool.not_true_is_false in H3. 
+      apply (HT st).
+      * apply E_IfFalse; auto.
+      * assumption.
+  - eapply H_Consequence with (P' := wp (WHILE b DO c END) Q).
+    apply H_While.
+    + apply IHc. apply wp_invariant with Q; auto. 
+    + intros. unfold wp. intros. apply (HT st); auto.
+    + intros. simpl in H. destruct H as [H1 H2]. apply H1.
+      apply E_WhileFalse. apply Bool.not_true_is_false in H2. auto.
+Qed.
 (** [] *)
 
 (** 最后，我们可能希望我们的公理霍尔逻辑是_'可决定的（decidable）'_；也就是说，这里
