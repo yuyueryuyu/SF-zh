@@ -2177,8 +2177,7 @@ Close Scope dcom_scope.
     theorem. *)
 
 (* 请在此处解答
-
-    [] *)
+   m [] *)
 
 (** **** 练习：4 星, advanced, optional (implement_dcom) 
 

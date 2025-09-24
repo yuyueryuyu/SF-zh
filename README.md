@@ -12,9 +12,9 @@ I am currently working on Vol 2: PLF.
 | Lists | √ | Hoare2 | √ (except improve_dcom & implement_dcom)|
 | Poly | √ | Smallstep | √ |
 | Tactics | √ | HoareAsLogic | √ |
-| Logic | √ |
-| IndProp | √ |
-| Maps | √ |
+| Logic | √ | Types | √ |
+| IndProp | √ | Stlc | √ |
+| Maps | √ | StlcProp | √ |
 | Imp | √ |
 | ImpParser | √ |
 | ImpCEvalFun | √ |

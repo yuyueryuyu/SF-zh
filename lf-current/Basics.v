@@ -1175,6 +1175,13 @@ Fixpoint plus' (n : nat) (m : nat) : nat :=
 
 (* 请在此处解答
 
+Fixpoint not_decreasing (n : nat) (m : nat) : nat :=
+  match n with
+  | O => m
+  | S (S n') => n'
+  | S n' => not_decreasing (S (S n')) m
+  end.
+  
     [] *)
 
 (* ################################################################# *)

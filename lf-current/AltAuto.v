@@ -830,110 +830,98 @@ Proof.
   induction Hmatch
     as [ | x | s1 re1 s2 re2 Hmatch1 IH1 Hmatch2 IH2
        | s1 re1 re2 Hmatch IH | re1 s2 re2 Hmatch IH
-       | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ].
-  - (* MEmpty *)
-    simpl. intros contra. inversion contra.
-    - simpl. intros contra. inversion contra. inversion H0.
-    - simpl. intros H1. rewrite app_length in H1. 
-      apply add_le_cases in H1 as H1'. destruct H1' as [H11 | H12].
-      + destruct IH1 as [s1' [s2' [s3' [IH11 [IH12 [IH13 IH14]]]]]]. 
-        apply H11. exists s1'. exists s2'. exists (s3'++s2).
+       | re | s1 s2 re Hmatch1 IH1 Hmatch2 IH2 ]; 
+    simpl; intros.
+  (* 原子的情况 *)
+  - inversion H.
+  - inversion H; subst. inversion H1.
+  (* App -> 循环可能在左，也可能在右 *)
+  - rewrite app_length in H. 
+    remember H as H'; clear HeqH'.
+    apply add_le_cases in H as H.
+    destruct H as [H1 | H2].
+    + (* 左边存在循环 *)
+      destruct IH1 as [s1' [s2' [s3' [HD1 [HD2 [HD3 HD4]]]]]]; try assumption.
+      exists s1'. exists s2'. exists (s3' ++ s2).
+      split. 
+      rewrite HD1. 
+      rewrite app_assoc. rewrite app_assoc. rewrite app_assoc.
+      reflexivity.
+      split; auto.
+      split; try lia.
+      intros. rewrite app_assoc. rewrite app_assoc. apply MApp.
+      rewrite <- app_assoc; auto. auto.
+    + (* 右边存在循环 *)
+      (* 分类讨论： 左边是否存在循环 *)
+      destruct (leb (pumping_constant re1) (length s1)) eqn: El.
+      (* 如果左边也存在循环 *)
+      * apply leb_iff in El.
+        destruct IH1 as [s1'' [s2'' [s3'' [HD1' [HD2' [HD3' HD4']]]]]]; try assumption.
+        exists s1''. exists s2''. exists (s3'' ++ s2).
         split.
-        * rewrite IH11. 
-          rewrite app_assoc. rewrite app_assoc. 
-          rewrite app_assoc. reflexivity.
-        * split. apply IH12.
-          split. 
-          apply (le_trans (length s1' + length s2') (pumping_constant re1) (pumping_constant re1 + pumping_constant re2)). 
-          apply IH13. apply le_plus_l.
-          { 
-            intros m. rewrite app_assoc. rewrite app_assoc.
-            apply MApp. 
-            { rewrite <- app_assoc. apply IH14. }
-            { apply Hmatch2. }
-          }
-      + destruct IH2 as [s1' [s2' [s3' [IH11 [IH12 [IH13 IH14]]]]]]. 
-        apply H12. destruct (leb (pumping_constant re1) (length s1)) eqn:Eleb.
-        * apply leb_iff in Eleb.
-          destruct IH1 as [s1'' [s2'' [s3'' [IH11' [IH12'[IH13' IH14']]]]]].
-          apply Eleb.
-          exists s1''. exists s2''. exists (s3''++s2).
-        split. rewrite IH11'.
-        rewrite app_assoc. rewrite app_assoc. 
-        rewrite app_assoc. reflexivity.
-        split. apply IH12'.
-        split. apply (le_trans (length s1'' + length s2'') (pumping_constant re1) (pumping_constant re1 + pumping_constant re2)). 
-        apply IH13'. apply le_plus_l.
-        { 
-            intros m. rewrite app_assoc. rewrite app_assoc.
-            apply MApp. 
-            { rewrite <- app_assoc. apply IH14'. }
-            { apply Hmatch2. }
-          }
-        * apply le_false_ge in Eleb. 
-          exists (s1++s1'). exists s2'. exists s3'.
-          split. rewrite IH11. 
-          rewrite app_assoc. rewrite app_assoc. 
-          reflexivity.
-          split. { apply IH12. } split.
-          simpl. rewrite app_length. rewrite <- plus_assoc.
-          apply plus_le_plus. split.
-          apply Eleb. apply IH13.
-          { 
-            intros m. rewrite <- app_assoc. apply MApp. 
-            { apply Hmatch1. }
-            { apply IH14. }
-          }
-    - simpl. intros H1. apply plus_le in H1. destruct H1 as [H11 H12].
-      destruct IH as [s2' [s3' [s4' [IH11 [IH12 [IH13 IH14]]]]]].
-      apply H11. exists s2'. exists s3'. exists s4'.
-      split. apply IH11. split. apply IH12. 
-      split. apply (le_trans (length s2' + length s3') (pumping_constant re1) (pumping_constant re1 + pumping_constant re2)).
-      apply IH13. apply le_plus_l. 
-      intros m. apply MUnionL. apply IH14.
-    - simpl. intros H1. apply plus_le in H1. destruct H1 as [H11 H12].
-      destruct IH as [s2' [s3' [s4' [IH11 [IH12 [IH13 IH14]]]]]].
-      apply H12. exists s2'. exists s3'. exists s4'.
-      split. apply IH11. split. apply IH12.
-      split. apply (le_trans (length s2' + length s3') (pumping_constant re2) (pumping_constant re1 + pumping_constant re2)).
-      apply IH13. rewrite plus_comm. apply le_plus_l.   
-      intros m. apply MUnionR. apply IH14.
-    - simpl. intros contra. 
-      inversion contra.
-      apply pumping_constant_0_false in H0. destruct H0.
-    - intros H. destruct s1 as [|h t] eqn:Es1.
-      + simpl in *. 
-        destruct IH2 as [s1' [s2' [s3' [IH21 [IH22 [IH23 IH24]]]]]].
-        * apply H. 
-        * exists s1'. exists s2'. exists s3'.
-          split. apply IH21.
-          split. apply IH22.
-          split. apply IH23.
-          apply IH24.
-      + destruct (leb (pumping_constant re) (length (h::t))) eqn:Elen.
-        * apply leb_iff in Elen.
-          destruct IH1 as [s1' [s2' [s3' [IH11 [IH12 [IH13 IH14]]]]]].
-          apply Elen.
-          exists s1'. exists s2'. exists (s3'++s2).
-          split. rewrite IH11. rewrite <- app_assoc. rewrite <- app_assoc.
-          reflexivity.
-          split. apply IH12.
-          split. apply IH13.
-          intros m. rewrite app_assoc. rewrite app_assoc. 
-          rewrite <- (app_assoc T s1' (napp m s2') s3').
-          apply MStarApp.
-          ** apply IH14.
-          ** apply Hmatch2.
-        * exists []. exists s1. exists s2.
-          simpl in *. split. rewrite Es1. simpl. reflexivity.
-          split. rewrite Es1. unfold not. intros contra.
-          discriminate contra.
-          split. apply le_false_ge in Elen. 
-          rewrite Es1. simpl. apply Elen.
-          intros m. apply napp_star. 
-          rewrite Es1. apply Hmatch1.
-          apply Hmatch2.
-Qed.
+        rewrite HD1'.
+        rewrite app_assoc. rewrite app_assoc. rewrite app_assoc.
+        reflexivity.
+        split; auto.
+        split; try lia.
+        intros. rewrite app_assoc. rewrite app_assoc. apply MApp.
+        rewrite <- app_assoc. auto. auto.
+      (* 如果左边不存在循环 *)
+      * apply le_false_ge in El.
+        destruct IH2 as [s1' [s2' [s3' [HD1 [HD2 [HD3 HD4]]]]]]; try assumption.
+        exists (s1 ++ s1'). exists s2'. exists s3'.
+        rewrite HD1. rewrite app_assoc. split; auto.
+        split; auto.
+        split. rewrite app_length. lia.
+        intros. rewrite <- app_assoc. apply MApp; auto.
+  - (* UnionL -> 循环在左边 *)
+    apply plus_le in H. destruct H as [H1 H2].
+    destruct IH as [s1' [s2' [s3' [HD1 [HD2 [HD3 HD4]]]]]]; try assumption.
+    exists s1'. exists s2'. exists s3'.
+    split. rewrite HD1. rewrite app_assoc. reflexivity.
+    split; auto.
+    split; try lia.
+    intros. apply MUnionL; auto.
+  - (* UnionR -> 循环在右边 *)
+    apply plus_le in H. destruct H as [H1 H2].
+    destruct IH as [s1' [s2' [s3' [HD1 [HD2 [HD3 HD4]]]]]]; try assumption.
+    exists s1'. exists s2'. exists s3'.
+    split. rewrite HD1. rewrite app_assoc. reflexivity.
+    split; auto.
+    split; try lia.
+    intros. apply MUnionR; auto.
+  - (* MStar0 -> 不可能存在循环 *)
+    inversion H.
+    apply pumping_constant_0_false in H1. exfalso; auto.
+  - (* MStar -> 本身就是循环 *)
+    (* 拆分出来 第一个循环s1 和后续循环 s2*)
+    (* s1 为空吗？*)
+    destruct s1 eqn:Es1.
+    + (* s1 为空 *)
+      simpl in *.
+      apply IH2; auto.
+    + (* s1 不为空 *)
+      (* s1 内部包含其他循环吗 *)
+      destruct (leb (pumping_constant re) (length s1)) eqn:Ele.
+      * (* 包含 *)
+        apply leb_iff in Ele.
+        subst. destruct IH1 as [s1' [s2' [s3' [HD1 [HD2 [HD3 HD4]]]]]]; try assumption.
+        exists s1'. exists s2'. exists (s3' ++ s2).
+        split. rewrite HD1. rewrite <- app_assoc. rewrite <- app_assoc.
+        auto. split; auto.
+        split; auto.
+        intros. rewrite app_assoc. rewrite app_assoc. apply MStarApp.
+        rewrite <- app_assoc. apply HD4. assumption.
+      * (* 不包含 *)
+        apply le_false_ge in Ele.
+        exists []. exists s1. exists s2.
+        simpl in *. subst.
+        split; simpl; auto.
+        split. intros contra; discriminate.
+        split. simpl in Ele; auto.
+        intros. apply napp_star; auto.
+Qed.  
+
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_pumping_redux_strong : option (nat*string) := None.
 (** [] *)

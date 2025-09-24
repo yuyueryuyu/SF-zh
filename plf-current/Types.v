@@ -168,7 +168,13 @@ Hint Unfold stuck.
 Example some_term_is_stuck :
   exists t, stuck t.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  exists (scc tru). unfold stuck, step_normal_form, value.
+  split; intros contra.
+  - destruct contra. inversion H; subst. inversion H1.
+  - destruct contra; inversion H.
+    inversion H1.
+Qed.
+  
 (** [] *)
 
 (** 然而，值和正规式在这个语言中_'并不'_相同，值的集合被包括在正规式的集合中。
@@ -178,8 +184,39 @@ Proof.
 Lemma value_is_nf : forall t,
   value t -> step_normal_form t.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. unfold step_normal_form. intros contra.
+  destruct contra. inversion H.
+  - inversion H1; subst; inversion H0.
+  - induction H0; inversion H1.
+    apply IHstep; auto.
+Qed.
+  
+Lemma value_is_nf_2 : forall t,
+  value t -> step_normal_form t.
+Proof.
+  intros. unfold step_normal_form. intros contra.
+  inversion H.
+  - destruct contra. inversion H1; subst; inversion H0.
+  - induction t; try inversion H0.
+    + destruct contra. inversion H1.
+    + apply IHt; auto.
+      destruct contra. inversion H3; subst.
+      exists t1'; assumption.
+Qed.
 
+Lemma value_is_nf_3 : forall t,
+  value t -> step_normal_form t.
+Proof.
+  intros. unfold step_normal_form. intros contra.
+  inversion H.
+  - destruct contra. inversion H1; subst; inversion H0.
+  - induction H0.
+    + destruct contra. inversion H0.
+    + apply IHnvalue; auto.
+      destruct contra. inversion H1; subst.
+      exists t1'; assumption.
+Qed.
+  
 (** （提示：在证明中的某个地方，你需要使用归纳来推理某个项，这个项已知是数值。
     归纳可以对项本身进行，也可以对它是数值这个证据进行。两种方法均可完成证明，
     但你发现一种要比另一种稍微简短一点。作为练习，请尝试使用这两种方法完成证明。）*)
@@ -188,11 +225,44 @@ Proof.
 (** **** 练习：3 星, standard, optional (step_deterministic) 
 
     使用 [value_is_nf] 来证明 [step] 关系是确定的。*)
+Lemma nvalue_is_value: forall t, nvalue t -> value t.
+Proof.
+  intros. right. auto.
+Qed.
 
 Theorem step_deterministic:
   deterministic step.
 Proof with eauto.
-  (* 请在此处解答 *) Admitted.
+  unfold deterministic. intros.
+  generalize dependent y2.
+  induction H; subst.
+  - intros. inversion H0; auto. inversion H4.
+  - intros. inversion H0; auto. inversion H4.
+  - intros. inversion H0; subst; try solve_by_invert.
+    apply IHstep in H5. rewrite H5. auto.
+  - intros. inversion H0; subst; try solve_by_invert.
+    apply IHstep in H2. rewrite H2; auto.
+  - intros. inversion H0; subst; try solve_by_invert; auto.
+  - apply nvalue_is_value in H.
+    apply value_is_nf in H. intros. inversion H0; subst; auto.
+    inversion H2; subst. unfold step_normal_form in H. exfalso.
+    apply H. exists t1'0. auto.
+  - intros. inversion H0; subst; try solve_by_invert.
+    inversion H; subst. apply nvalue_is_value in H2.
+    apply value_is_nf in H2. exfalso. apply H2. exists t1'0.
+    assumption.
+    apply IHstep in H2. rewrite H2. reflexivity.
+  - intros. inversion H0; subst; try solve_by_invert; auto.
+  - intros. apply nvalue_is_value in H.
+    apply value_is_nf in H. inversion H0; subst; auto.
+    inversion H2; subst. exfalso. apply H. exists t1'0; auto.
+  - intros. inversion H0; subst; try solve_by_invert.
+    inversion H; subst. apply nvalue_is_value in H2.
+    apply value_is_nf in H2. exfalso. apply H2. exists t1'0.
+    assumption.
+    apply IHstep in H2. rewrite H2. reflexivity.
+Qed.
+
 (** [] *)
 
 (* ================================================================= *)
@@ -293,7 +363,8 @@ Example scc_hastype_nat__hastype_nat : forall t,
   |- scc t \in Nat ->
   |- t \in Nat.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. inversion H; auto.
+Qed.
 (** [] *)
 
 (* ----------------------------------------------------------------- *)
@@ -345,7 +416,23 @@ Proof with auto.
     + (* t1 可前进一步 *)
       inversion H as [t1' H1].
       exists (test t1' t2 t3)...
-  (* 请在此处解答 *) Admitted.
+  - (*suc*)
+    inversion IHHT.
+    + apply (nat_canonical t1 HT) in H.
+      left. right. apply nv_scc. assumption.
+    + right. destruct H. exists (scc x)...
+  - right. inversion IHHT.
+    + apply (nat_canonical t1 HT) in H.
+      inversion H; subst. exists zro...
+      exists t...
+    + inversion H; subst. exists (prd x)...
+  - right. inversion IHHT; subst.
+    + apply (nat_canonical t1 HT) in H.
+      inversion H; subst.
+      exists tru...
+      exists fls...
+    + destruct H; subst. exists (iszro x)...
+Qed.
 (** [] *)
 
 (** **** 练习：3 星, advanced (finish_progress_informal) 
@@ -369,7 +456,18 @@ Proof with auto.
 
       - 如果 [t1] 自己可以前进一步，那么根据 [ST_Test] 可得 [t] 也可以。
 
-    - (* 请在此处解答 *)
+    - 如果是scc，t = scc t1其中 |- t1 \in Nat，根据归纳假设，t1要么是值要么可以前进到t1'
+      如果t1是值，根据典范形式引理以及|-t1 \in Nat，可以得知t1是nvalue，
+      因此根据nvalue的定义 scc t1也是一个nvalue，因此t是一个值
+      如果t1可以前进一步，那么根据scc的规则，t也可以前进一步
+    - 如果是prd，t = prd t1其中 |- t1 \in Nat，根据归纳假设，t1要么是值要么可以前进到t1'
+      如果t1是值，根据典范形式引理以及|-t1 \in Nat，可以得知t1是nvalue，因此要么是zro，
+      要么是scc x，如果是zro，prd zro可以前进一步到zro，如果是scc x， prd scc x可以前进一步到x
+      如果t1可以前进一步，那么根据prd的规则，t也可以前进一步
+    - 如果是iszro t = iszro t1其中 |- t1 \in Nat，根据归纳假设，t1要么是值要么可以前进到t1'
+      如果t1是值，根据典范形式引理以及|-t1 \in Nat，可以得知t1是nvalue，因此要么是zro，
+      要么是scc x，如果是zro，iszro zro可以前进一步到tru，如果是scc x， iszro scc x可以前进一步到fls
+      如果t1可以前进一步，那么根据iszro的规则，t也可以前进一步
  *)
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_finish_progress_informal : option (nat*string) := None.
@@ -405,9 +503,15 @@ Proof with auto.
       + (* ST_TestFls *) assumption.
       + (* ST_Test *) apply T_Test; try assumption.
         apply IHHT1; assumption.
-    (* 请在此处解答 *) Admitted.
-(** [] *)
-
+    - inversion HE; subst. apply IHHT in H0.
+      apply T_Scc. assumption.
+    - inversion HE; subst.
+      + apply T_Zro.
+      + apply scc_hastype_nat__hastype_nat. assumption.
+      + apply T_Prd. apply IHHT. assumption.
+    - inversion HE; subst; constructor.
+      apply IHHT. assumption.
+Qed.  
 (** **** 练习：3 星, advanced (finish_preservation_informal) 
 
     请完成非形式化的证明： *)
@@ -434,7 +538,21 @@ Proof with auto.
         因此根据归纳假设可得 [|- t1' \in Bool]。正如需要的那样，规则
         [T_Test] 为我们提供了 [|- test t1' then t2 else t3 \in T]。
 
-    - (* 请在此处解答 *)
+    - 如果导出式的最后一条规则是 [T_Scc]，那么 [t = scc t1]，其中 
+      [|- t1 \in Nat]. 根据ST_Scc scc t1 --> scc t1'
+      根据归纳假设可得|- t1' \in Nat T_Scc证明scc t1 \in Nat
+    - 如果导出式的最后一条规则是 [T_Prd]，那么 [t = prd t1]，其中 
+      [|- t1 \in Nat]. 
+      - 如果最后的规则是ST_PrdZro，那么 t = prd zro, 只需证明|- zro \in Nat
+        使用T_Zro即可退出
+      - 如果最后的规则是ST_PrdScc 那么 t = prd (scc t') 只需证明|- t' \in Nat
+        由归纳假设可以得到scc t' \in Nat，使用scc_hastype_nat__hastype_nat即可得到
+      - 如果是ST_Prd 根据ST_Prd prd t1 --> prd t1'
+      根据归纳假设可得|- t1' \in Nat T_Prd证明prd t1 \in Nat
+    - 如果导出式的最后一条规则是 [T_iszro]，那么 [t = iszro t1]，
+      如果是tru = iszro zro 只需|- zro \in Nat使用T_Zro即可退出
+      如果是fls = iszro (scc t) 同样，只需使用T_Scc即可
+      如果是iszro t --> iszro t'，使用归纳假设，即可得到。
 *)
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_finish_preservation_informal : option (nat*string) := None.
@@ -451,7 +569,14 @@ Theorem preservation' : forall t t' T,
   t --> t' ->
   |- t' \in T.
 Proof with eauto.
-  (* 请在此处解答 *) Admitted.
+  intros. generalize dependent T. induction H0; intros; inversion H...
+  - subst. inversion H0; subst. constructor.
+  - subst. inversion H0; subst. constructor. 
+    inversion H3; subst. inversion H4; subst. assumption.
+  - inversion H0; subst. constructor.
+  - inversion H0; subst. constructor.
+Qed.
+
 (** [] *)
 
 (** 保型性定理也经常被称作_'主语归约（subject reduction）'_，因为它告诉了
@@ -488,6 +613,15 @@ Proof.
 
     (* 请在此处解答 *)
 *)
+Theorem subject_expansion : exists t t' T, 
+  t --> t' ->
+  |- t' \in T ->
+  ~(|- t \in T).
+Proof.
+  exists (test tru tru zro). exists tru. exists Bool.
+  intros. intros contra. inversion contra; subst.
+  inversion H7.
+Qed.
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_subject_expansion : option (nat*string) := None.
 (** [] *)
@@ -503,11 +637,13 @@ Definition manual_grade_for_subject_expansion : option (nat*string) := None.
   下面的哪些性质仍然成立？对于每个性质，写下“仍然成立”或“不成立”。
   如果性质不再成立，请给出一个反例。
       - [step] 的确定性
-            (* 请在此处解答 *)
+          仍然成立
       - 可进性
-            (* 请在此处解答 *)
+          不成立
+          |- scc tru \in Bool, stuck (scc tru)
       - 保型性
-            (* 请在此处解答 *)
+          仍然成立
+
 *)
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_variation1 : option (nat*string) := None.
@@ -521,6 +657,11 @@ Definition manual_grade_for_variation1 : option (nat*string) := None.
            (test tru t2 t3) --> t3
 
    上面的哪些性质不再成立？对于不再成立的性质，给出一个反例。
+   确定性不再成立，test tru t2 t3 --> t3(ST_Funny1)
+   test tru t2 t3 --> t2 (ST_TestTru)
+   t2 <> t3
+   可进性成立
+   保型性成立
             (* 请在此处解答 *)
 *)
 (* 请勿修改下面这一行： *)
@@ -537,6 +678,11 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
 
    this rule?  For each one that does, give a counter-example.
             (* 请在此处解答 *)
+    确定性不成立 test tru (scc prd zro) zro --> scc prd zro （TestTru)
+    test tru (scc prd zro) zro --> test tru scc zro zro （Funny2)
+
+    可进性仍然成立
+    保型性仍然成立
 *)
 (** [] *)
 
@@ -548,6 +694,7 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
           (prd fls) --> (prd (prd fls))
 
    上面的哪些性质不再成立？对于不再成立的性质，给出一个反例。
+   都仍然成立
 (* 请在此处解答 *)
 *)
 (** [] *)
@@ -560,6 +707,7 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
             |- zro \in Bool
 
    上面的哪些性质不再成立？对于不再成立的性质，给出一个反例。
+   可进性不成立 test zro tru fls 会卡住
 (* 请在此处解答 *)
 *)
 (** [] *)
@@ -572,6 +720,7 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
             |- prd zro \in Bool
 
    上面的哪些性质不再成立？对于不再成立的性质，给出一个反例。
+   保型性不成立 prd zro \in Bool --> zro \in Nat
 (* 请在此处解答 *)
 *)
 (** [] *)
@@ -582,7 +731,9 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
     即，对定义的改变只会导致某一个性质不再成立，而其他仍然成立。
 *)
 (* 请在此处解答
-
+  确定性：增加一条相同源状态的step规则，同时确保源状态和目标状态类型一致
+  可进性：给一个卡住的状态赋予类型
+  保型性：给一个非normal form的项设置为另一个类型
     [] *)
 
 (** **** 练习：1 星, standard (remove_prdzro) 
@@ -592,6 +743,7 @@ Definition manual_grade_for_variation2 : option (nat*string) := None.
     这样做会导致别的问题出现吗？
 
 (* 请在此处解答 *)
+不可以，这样会导致可进性被破坏
 *)
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_remove_predzro : option (nat*string) := None.
@@ -606,7 +758,8 @@ Definition manual_grade_for_remove_predzro : option (nat*string) := None.
     使用小步语义来陈述保型性和可进性？
 
 (* 请在此处解答 *)
-*)
+可进性： forall t T, exists n, |- t \in T -> t ->> n
+保型性： forall t n T, t ->> n -> |- t \in T -> typeof n = typeof T *)
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_prog_pres_bigstep : option (nat*string) := None.
 (** [] *)

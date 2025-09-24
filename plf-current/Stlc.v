@@ -344,15 +344,50 @@ where "'[' x ':=' s ']' t" := (subst x s t).
 Inductive substi (s : tm) (x : string) : tm -> tm -> Prop :=
   | s_var1 :
       substi s x (var x) s
-  (* 请在此处解答 *)
+  | s_var2 : forall x',
+      x <> x' -> 
+      substi s x (var x') (var x')
+  | s_abs1 : forall x' T t1 t2, 
+      x <> x' ->
+      substi s x t1 t2 ->
+      substi s x (abs x' T t1) (abs x' T t2)
+  | s_abs2 : forall T t1,
+      substi s x (abs x T t1) (abs x T t1)
+  | s_app : forall t1 t1' t2 t2',
+      substi s x t1 t1' ->
+      substi s x t2 t2' ->
+      substi s x (app t1 t2) (app t1' t2')
+  | s_tru : substi s x tru tru
+  | s_fls : substi s x fls fls
+  | s_test1 : forall t1 t1' t2 t2' t3 t3',
+      substi s x t1 t1' ->
+      substi s x t2 t2' ->
+      substi s x t3 t3' ->
+      substi s x (test t1 t2 t3) (test t1' t2' t3')
 .
 
 Hint Constructors substi.
-
 Theorem substi_correct : forall s x t t',
   [x:=s]t = t' <-> substi s x t t'.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. split; intros.
+  - generalize dependent s. generalize dependent x0.
+    generalize dependent t'. induction t; intros; simpl in *; subst; auto.
+    + destruct (eqb_string x0 s) eqn: Eh; subst.
+      apply eqb_string_true_iff in Eh; subst. auto.
+      apply s_var2. apply eqb_string_false_iff in Eh; assumption.
+    + destruct (eqb_string x0 s) eqn: Eh; subst.
+      apply eqb_string_true_iff in Eh; subst. apply s_abs2.
+      apply eqb_string_false_iff in Eh. auto.
+  - induction H; simpl; subst; auto.
+    + rewrite <- eqb_string_refl. auto.
+    + apply eqb_string_false_iff in H. rewrite H. auto.
+    + apply eqb_string_false_iff in H. rewrite H. auto.
+    + rewrite <- eqb_string_refl; auto.
+Qed.
+
+    
+
 (** [] *)
 
 (* ================================================================= *)
@@ -539,13 +574,17 @@ Lemma step_example5 :
        app (app idBBBB idBB) idB
   -->* idB.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  eapply multi_step. apply ST_App1. apply ST_AppAbs; auto.
+  simpl. eapply multi_step. apply ST_AppAbs; auto.
+  simpl. apply multi_refl.
+Qed. 
 
 Lemma step_example5_with_normalize :
        app (app idBBBB idBB) idB
   -->* idB.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  normalize.
+Qed.
 (** [] *)
 
 (* ################################################################# *)
@@ -674,7 +713,11 @@ Example typing_example_2_full :
           (app (var y) (app (var y) (var x))))) \in
     (Arrow Bool (Arrow (Arrow Bool Bool) Bool)).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  apply T_Abs. apply T_Abs. apply T_App with Bool. 
+  apply T_Var. apply update_eq.
+  apply T_App with Bool; apply T_Var. apply update_eq.
+  apply update_neq. unfold x, y. intros c. discriminate.
+Qed.
 (** [] *)
 
 (** **** 练习：2 星, standard (typing_example_3) 
@@ -695,7 +738,13 @@ Example typing_example_3 :
                (app (var y) (app (var x) (var z)))))) \in
       T.
 Proof with auto.
-  (* 请在此处解答 *) Admitted.
+  exists (Arrow (Arrow Bool Bool) (Arrow (Arrow Bool Bool) (Arrow Bool Bool))). 
+  apply T_Abs. apply T_Abs. apply T_Abs. apply T_App with Bool. apply T_Var.
+  apply update_neq; unfold z, y; discriminate.
+  apply T_App with Bool; apply T_Var.
+  apply update_neq; unfold z, x; discriminate.
+  apply update_eq.
+Qed.
 (** [] *)
 
 (** 我们也可以证明某些项_'不'_可定型。比如说，我们可以形式化地检查对于
@@ -738,7 +787,16 @@ Example typing_nonexample_3 :
              (app (var x) (var x))) \in
           T).
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros contra. destruct contra as [T1 [T2 H]]. 
+  inversion H; subst.
+  inversion H5; subst. inversion H3; subst.
+  inversion H6; subst.  
+  inversion H2; subst. inversion H4; subst.
+  clear H4. clear H2. clear H6. clear H3. clear H5. clear H.
+  induction T11; inversion H1. subst.
+  apply IHT11_1. assumption.
+Qed.
+  
 (** [] *)
 
 End STLC.

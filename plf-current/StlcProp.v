@@ -141,7 +141,27 @@ Theorem progress' : forall t T,
 Proof.
   intros t.
   induction t; intros T Ht; auto.
-  (* 请在此处解答 *) Admitted.
+  - inversion Ht; subst. inversion H1.
+  - right. inversion Ht; subst. 
+    destruct (IHt2 T11); auto.
+    + inversion H2; subst; try solve_by_invert.
+      * exists ([x0 := t2] t12). apply ST_AppAbs; assumption.
+      * destruct (IHt1 (Arrow T11 T)); auto; try solve_by_invert.
+        destruct H3. exists (app x0 t2); apply ST_App1; assumption.
+      * destruct (IHt1 (Arrow T11 T)); auto; try solve_by_invert.
+        destruct H5. exists (app x0 t2); apply ST_App1; assumption.
+    + destruct (IHt1 (Arrow T11 T)); auto.
+      * destruct H. exists(app t1 x0); auto.
+      * destruct H0. exists(app x0 t2); auto.
+  - right. inversion Ht; subst.
+    destruct (IHt1 Bool); auto.
+    + inversion H; subst; try solve_by_invert.
+      * exists t2; apply ST_TestTru.
+      * exists t3; apply ST_TestFls.
+    + destruct H. exists (test x0 t2 t3); auto.
+Qed.
+
+
 (** [] *)
 
 (* ################################################################# *)
@@ -245,7 +265,18 @@ Definition closed (t:tm) :=
     understanding it is crucial to understanding substitution and its
     properties, which are really the crux of the lambda-calculus. *)
 
-(* 请在此处解答 *)
+(* 请在此处解答 
+afi_var： 对于任何直接出现x的var项，显然它没有一个良好的定义，所以它free
+afi_app1，2： 对于任何出现在application的抽象项（t1）或者参数项（t2）中的变量x，
+如果它在t1中是free的，
+由于application项不会追加新的定义，所以它在application项中也是free的
+afi_abs: 对于任何出现在abstraction项的“函数体”中的变量，由于
+这个项会追加一个形参定义，假如形参名不等于变量x，且x在函数体中也没有被定义，
+则x在这个abstraction项是free的
+afi_test1,2,3：对于任何出现在test项的t1 t2 t3三个项中的，由于test本身没有新定义变量，
+所以如果这个变量没有在1 2 3中被定义，那它在test中也是free的
+
+*)
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_afi : option (nat*string) := None.
@@ -315,7 +346,13 @@ Corollary typable_empty__closed : forall t T,
     empty |- t \in T  ->
     closed t.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros t T H. unfold closed. 
+  intros s contra. 
+  apply free_in_context with (T:=T) (Gamma:=empty) in contra; auto.
+  destruct contra. inversion H0.
+Qed.   
+    
+  
 (** [] *)
 
 (** Sometimes, when we have a proof of some typing relation
@@ -595,7 +632,7 @@ Qed.
     explanation. *)
 
 (* 请在此处解答 *)
-
+(* 同理 test tru tru (\x:Bool. x)*)
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_subject_expansion_stlc : option (nat*string) := None.
 (** [] *)
@@ -619,7 +656,12 @@ Proof.
   intros t t' T Hhas_type Hmulti. unfold stuck.
   intros [Hnf Hnot_val]. unfold normal_form in Hnf.
   induction Hmulti.
-  (* 请在此处解答 *) Admitted.
+  - apply progress in Hhas_type. destruct Hhas_type; auto.
+  - apply preservation with (T:=T) in H; auto.
+Qed.
+
+
+    
 (** [] *)
 
 (* ################################################################# *)
@@ -635,7 +677,16 @@ Theorem unique_types : forall Gamma e T T',
   Gamma |- e \in T' ->
   T = T'.
 Proof.
-  (* 请在此处解答 *) Admitted.
+  intros. generalize dependent T'. induction H; intros.
+  - inversion H0; subst. rewrite H3 in H. inversion H; subst; auto.
+  - inversion H0; subst. rewrite IHhas_type with T1; auto.
+  - inversion H1; subst. apply IHhas_type1 in H5.
+    apply IHhas_type2 in H7. subst. inversion H5; auto.
+  - inversion H0; auto.
+  - inversion H0; auto.
+  - inversion H2; auto.
+Qed.
+
 (** [] *)
 
 (* ################################################################# *)
@@ -671,10 +722,11 @@ and the following typing rule:
     false, give a counterexample.
 
       - Determinism of [step]
+(* 请在此处解答 *) becomes false. test tru tru tru --> tru / zap
+      - Progress  becomes false zap in T, ~(value zap) /\ exists t', ~(zap --> t')
 (* 请在此处解答 *)
-      - Progress
-(* 请在此处解答 *)
-      - Preservation
+      - Preservation becomes false. zap in Bool -> Bool 
+        fls --> zap 
 (* 请在此处解答 *)
 *)
 
@@ -698,11 +750,11 @@ Definition manual_grade_for_stlc_variation1 : option (nat*string) := None.
     "remains true" or else "becomes false." If a property becomes
     false, give a counterexample.
 
-      - Determinism of [step]
+      - Determinism of [step] remains true
 (* 请在此处解答 *)
-      - Progress
+      - Progress remains true
 (* 请在此处解答 *)
-      - Preservation
+      - Preservation becomes false. foo has no type
 (* 请在此处解答 *)
 *)
 
@@ -718,11 +770,11 @@ Definition manual_grade_for_stlc_variation2 : option (nat*string) := None.
     "remains true" or else "becomes false." If a property becomes
     false, give a counterexample.
 
-      - Determinism of [step]
+      - Determinism of [step] remains true
 (* 请在此处解答 *)
-      - Progress
+      - Progress becomes false \h. app (app (\x.\y.x) h) h not a value but can't progress
 (* 请在此处解答 *)
-      - Preservation
+      - Preservation remains true 
 (* 请在此处解答 *)
 *)
 
@@ -743,11 +795,14 @@ Definition manual_grade_for_stlc_variation3 : option (nat*string) := None.
     "remains true" or else "becomes false." If a property becomes
     false, give a counterexample.
 
-      - Determinism of [step]
+      - Determinism of [step] becomes false
+      test tru then fls else tru --> tru / fls 
 (* 请在此处解答 *)
-      - Progress
+      - Progress remains true
 (* 请在此处解答 *)
-      - Preservation
+      - Preservation becomes false
+      test tru then \x. tru else \y. fls \in Bool -> Bool
+      --> tru \in Bool
 (* 请在此处解答 *)
 *)
 (** [] *)
@@ -767,11 +822,11 @@ Definition manual_grade_for_stlc_variation3 : option (nat*string) := None.
     "remains true" or else "becomes false." If a property becomes
     false, give a counterexample.
 
-      - Determinism of [step]
+      - Determinism of [step] remains true
 (* 请在此处解答 *)
-      - Progress
+      - Progress remains true
 (* 请在此处解答 *)
-      - Preservation
+      - Preservation remains true
 (* 请在此处解答 *)
 *)
 (** [] *)
@@ -791,11 +846,11 @@ Definition manual_grade_for_stlc_variation3 : option (nat*string) := None.
     "remains true" or else "becomes false." If a property becomes
     false, give a counterexample.
 
-      - Determinism of [step]
+      - Determinism of [step] remains true
 (* 请在此处解答 *)
-      - Progress
+      - Progress remains true
 (* 请在此处解答 *)
-      - Preservation
+      - Preservation remains true
 (* 请在此处解答 *)
 *)
 (** [] *)
@@ -813,11 +868,11 @@ Definition manual_grade_for_stlc_variation3 : option (nat*string) := None.
     "remains true" or else "becomes false." If a property becomes
     false, give a counterexample.
 
-      - Determinism of [step]
+      - Determinism of [step] remains true
+(* 请在此处解答 *) 
+      - Progress remians true
 (* 请在此处解答 *)
-      - Progress
-(* 请在此处解答 *)
-      - Preservation
+      - Preservation remains true
 (* 请在此处解答 *)
 *)
 (** [] *)
@@ -893,6 +948,306 @@ Inductive tm : Type :=
         accepts the whole file. *)
 
 (* 请在此处解答 *)
+Inductive value : tm -> Prop :=
+  | v_abs : forall x T t,
+      value (abs x T t)
+  | v_const : forall n,
+      value (const n).
+
+Reserved Notation "'[' x ':=' s ']' t" (at level 20).
+
+Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
+  match t with
+  | var x' =>
+      if eqb_string x x' then s else t
+  | abs x' T t1 =>
+      abs x' T (if eqb_string x x' then t1 else ([x:=s] t1))
+  | app t1 t2 =>
+      app ([x:=s] t1) ([x:=s] t2)
+  | const n => const n
+  | scc t => scc ([x:=s] t)
+  | prd t => prd ([x:=s] t)
+  | mlt t1 t2 => mlt ([x:=s] t1) ([x:=s] t2)
+  | test0 t1 t2 t3 =>
+      test0 ([x:=s] t1) ([x:=s] t2) ([x:=s] t3)
+  end
+where "'[' x ':=' s ']' t" := (subst x s t).
+
+Reserved Notation "t1 '-->' t2" (at level 40).
+
+Inductive step : tm -> tm -> Prop :=
+  | ST_AppAbs : forall x T t12 v2,
+         value v2 ->
+         (app (abs x T t12) v2) --> [x:=v2]t12
+  | ST_App1 : forall t1 t1' t2,
+         t1 --> t1' ->
+         app t1 t2 --> app t1' t2
+  | ST_App2 : forall v1 t2 t2',
+         value v1 ->
+         t2 --> t2' ->
+         app v1 t2 --> app v1  t2'
+  | ST_Scc : forall t t',
+         t --> t' ->
+         scc t --> scc t'
+  | ST_Scc_n : forall n,
+         scc (const n) --> const (S n)
+  | ST_Prd : forall t t',
+         t --> t' ->
+         prd t --> prd t'
+  | ST_Prd_n : forall n,
+         prd (const n) --> const (pred n)
+  | ST_Mlt1 : forall t1 t1' t2,
+         t1 --> t1' ->
+         mlt t1 t2 --> mlt t1' t2
+  | ST_Mlt2 : forall v1 t2 t2',
+         value v1 ->
+         t2 --> t2' ->
+         mlt v1 t2 --> mlt v1 t2'
+  | ST_Mlt: forall n1 n2,
+         mlt (const n1) (const n2) --> const (n1 * n2)
+  | ST_Test0 : forall t1 t1' t2 t3,
+         t1 --> t1' ->
+         test0 t1 t2 t3 --> test0 t1' t2 t3
+  | ST_Test0_O : forall t2 t3,
+         test0 (const O) t2 t3 --> t3
+  | ST_Test0_Sn : forall n t2 t3,
+         test0 (const (S n)) t2 t3 --> t2 
+
+where "t1 '-->' t2" := (step t1 t2).
+
+Hint Constructors step.
+Notation multistep := (multi step).
+Notation "t1 '-->*' t2" := (multistep t1 t2) (at level 40).
+
+Definition context := partial_map ty.
+
+Reserved Notation "Gamma '|-' t '\in' T" (at level 40).
+
+Inductive has_type : context -> tm -> ty -> Prop :=
+  | T_Var : forall Gamma x T,
+      Gamma x = Some T ->
+      Gamma |- var x \in T
+  | T_Abs : forall Gamma x T11 T12 t12,
+      (x |-> T11 ; Gamma) |- t12 \in T12 ->
+      Gamma |- abs x T11 t12 \in Arrow T11 T12
+  | T_App : forall T11 T12 Gamma t1 t2,
+      Gamma |- t1 \in Arrow T11 T12 ->
+      Gamma |- t2 \in T11 ->
+      Gamma |- app t1 t2 \in T12
+  | T_Const : forall Gamma n,
+       Gamma |- const n \in Nat
+  | T_Scc : forall Gamma t,
+       Gamma |- t \in Nat ->
+       Gamma |- scc t \in Nat
+  | T_Prd : forall Gamma t,
+       Gamma |- t \in Nat ->
+       Gamma |- prd t \in Nat
+  | T_Mlt : forall Gamma t1 t2,
+       Gamma |- t1 \in Nat ->
+       Gamma |- t2 \in Nat ->
+       Gamma |- mlt t1 t2 \in Nat
+  | T_Test0 : forall t1 t2 t3 T Gamma,
+       Gamma |- t1 \in Nat ->
+       Gamma |- t2 \in T ->
+       Gamma |- t3 \in T ->
+       Gamma |- test0 t1 t2 t3 \in T
+
+where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
+
+Hint Constructors has_type.
+
+Inductive appears_free_in : string -> tm -> Prop :=
+  | afi_var : forall x,
+      appears_free_in x (var x)
+  | afi_app1 : forall x t1 t2,
+      appears_free_in x t1 ->
+      appears_free_in x (app t1 t2)
+  | afi_app2 : forall x t1 t2,
+      appears_free_in x t2 ->
+      appears_free_in x (app t1 t2)
+  | afi_abs : forall x y T11 t12,
+      y <> x  ->
+      appears_free_in x t12 ->
+      appears_free_in x (abs y T11 t12)
+  | afi_scc : forall x t1,
+      appears_free_in x t1 ->
+      appears_free_in x (scc t1)
+  | afi_prd : forall x t1,
+      appears_free_in x t1 ->
+      appears_free_in x (prd t1)
+  | afi_mlt1 : forall x t1 t2,
+      appears_free_in x t1 ->
+      appears_free_in x (mlt t1 t2)
+  | afi_mlt2 : forall x t1 t2,
+      appears_free_in x t2 ->
+      appears_free_in x (mlt t1 t2)
+  | afi_test1 : forall x t1 t2 t3,
+      appears_free_in x t1 ->
+      appears_free_in x (test0 t1 t2 t3)
+  | afi_test2 : forall x t1 t2 t3,
+      appears_free_in x t2 ->
+      appears_free_in x (test0 t1 t2 t3)
+  | afi_test3 : forall x t1 t2 t3,
+      appears_free_in x t3 ->
+      appears_free_in x (test0 t1 t2 t3).
+
+Hint Constructors appears_free_in.
+
+Lemma context_invariance : forall Gamma Gamma' t T,
+     Gamma |- t \in T  ->
+     (forall x, appears_free_in x t -> Gamma x = Gamma' x) ->
+     Gamma' |- t \in T.
+Proof with eauto. 
+  intros Gamma Gamma' t T H. generalize dependent Gamma'.
+  induction H; intros.
+  - apply T_Var. rewrite <- H0...
+  - apply T_Abs. apply IHhas_type. intros.
+    destruct (eqb_stringP x0 x1) as [Heq | Heq].
+    + subst. repeat rewrite update_eq...
+    + repeat rewrite update_neq...
+  - apply T_App with T11...
+  - apply T_Const.
+  - apply T_Scc. apply IHhas_type...
+  - apply T_Prd. apply IHhas_type...
+  - apply T_Mlt. apply IHhas_type1... apply IHhas_type2...
+  - apply T_Test0. 
+    apply IHhas_type1...
+    apply IHhas_type2...
+    apply IHhas_type3...
+Qed.
+
+Lemma free_in_context : forall x t T Gamma,
+   appears_free_in x t ->
+   Gamma |- t \in T ->
+   exists T', Gamma x = Some T'.
+Proof with eauto.
+  intros. generalize dependent Gamma. generalize dependent T.
+  induction H; intros.
+  - exists T. inversion H0...
+  - inversion H0; subst.
+    destruct IHappears_free_in with (Arrow T11 T) Gamma...
+  - inversion H0; subst.
+    destruct IHappears_free_in with T11 Gamma...
+  - inversion H1; subst. 
+    destruct IHappears_free_in with T12 (y0 |-> T11; Gamma)...
+    rewrite update_neq in H2...
+  - inversion H0; subst. 
+    destruct IHappears_free_in with Nat Gamma...
+  - inversion H0; subst.
+    destruct IHappears_free_in with Nat Gamma...
+  - inversion H0; subst.
+    destruct IHappears_free_in with Nat Gamma... 
+  - inversion H0; subst.
+    destruct IHappears_free_in with Nat Gamma...
+  - inversion H0; subst.
+    destruct IHappears_free_in with Nat Gamma... 
+  - inversion H0; subst.
+    destruct IHappears_free_in with T Gamma...
+  - inversion H0; subst.
+    destruct IHappears_free_in with T Gamma...
+Qed.  
+
+Definition closed (t:tm) :=
+  forall x, ~ appears_free_in x t.
+
+Corollary typable_empty__closed : forall t T,
+    empty |- t \in T  ->
+    closed t.
+Proof.
+  intros t T H. unfold closed. 
+  intros s contra. 
+  apply free_in_context with (T:=T) (Gamma:=empty) in contra; auto.
+  destruct contra. inversion H0.
+Qed.   
+
+Lemma substitution_preserves_typing : forall Gamma x U t v T,
+  (x |-> U ; Gamma) |- t \in T ->
+  empty |- v \in U   ->
+  Gamma |- [x:=v]t \in T.
+Proof with eauto. 
+  intros Gamma x U t. generalize dependent Gamma.
+  generalize dependent x. generalize dependent U.
+  induction t; intros; simpl.
+  - destruct (eqb_stringP x0 s) as [Heq | Heq]; subst.
+    + inversion H; subst. rewrite update_eq in H3. 
+      inversion H3; subst. eapply context_invariance...
+      intros. apply typable_empty__closed in H0. 
+      exfalso; apply (H0 x0); assumption.
+    + inversion H; subst. rewrite update_neq in H3; auto.
+  - inversion H; subst. apply T_App with T11.
+    + apply IHt1 with U; auto.
+    + apply IHt2 with U; auto.
+  - inversion H; subst. 
+    destruct (eqb_stringP x0 s) as [Heq | Heq]; subst.
+    + apply T_Abs. rewrite update_shadow in H6. auto.
+    + apply T_Abs. apply IHt with U; auto. rewrite update_permute; auto.
+  - inversion H; subst. apply T_Const.
+  - inversion H; subst. apply T_Scc. apply IHt with U; auto.
+  - inversion H; subst. apply T_Prd. apply IHt with U; auto.
+  - inversion H; subst. apply T_Mlt. apply IHt1 with U; auto.
+    apply IHt2 with U; auto.
+  - inversion H; subst. apply T_Test0. apply IHt1 with U; auto.
+    apply IHt2 with U; auto. apply IHt3 with U; auto.
+Qed.
+
+Theorem progress : forall t T,
+  empty |- t \in T ->
+  value t \/ exists t', t --> t'.
+Proof with eauto.
+  intros t. induction t; intros.
+  - inversion H; subst. inversion H2.
+  - inversion H; subst. destruct (IHt1 (Arrow T11 T)); auto.
+    destruct (IHt2 T11); auto.
+    + right. inversion H0; subst. exists ([x0:=t2] t)...
+      inversion H3.
+    + right. inversion H1; subst. exists (app t1 x0)...
+    + right. inversion H0; subst. exists (app x0 t2)...
+  - left. apply v_abs. 
+  - left. apply v_const.
+  - right. inversion H; subst. destruct (IHt Nat); auto.
+    + inversion H0; subst. inversion H2.
+      exists (const (S n))...
+    + inversion H0; subst. exists (scc x0)...
+  - right. inversion H; subst. destruct (IHt Nat); auto.
+    + inversion H0; subst. inversion H2.
+      exists (const (pred n))...
+    + inversion H0; subst. exists (prd x0)...
+  - right. inversion H; subst. destruct (IHt1 Nat); auto.
+    destruct (IHt2 Nat); auto.
+    + inversion H0; subst; try solve_by_invert.
+      inversion H1; subst; try solve_by_invert.
+      exists (const (n*n0))...
+    + inversion H1; subst. exists (mlt t1 x0)...
+    + inversion H0; subst. exists (mlt x0 t2)...
+  - right. inversion H; subst. destruct (IHt1 Nat)...
+    + inversion H0; subst; try solve_by_invert.
+      destruct n.
+      * exists t3...
+      * exists t2...
+    + inversion H0; subst. exists (test0 x0 t2 t3)...
+Qed. 
+
+Theorem preservation : forall t t' T,
+  empty |- t \in T  ->
+  t --> t'  ->
+  empty |- t' \in T.
+Proof with eauto.
+  intros. generalize dependent T. induction H0; intros.
+  - inversion H0; subst. inversion H4; subst. 
+    eapply substitution_preserves_typing...
+  - inversion H...
+  - inversion H1...
+  - inversion H...
+  - inversion H...
+  - inversion H... 
+  - inversion H...
+  - inversion H...
+  - inversion H1... 
+  - inversion H...
+  - inversion H...
+  - inversion H...
+  - inversion H...
+Qed.  
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_stlc_arith : option (nat*string) := None.
