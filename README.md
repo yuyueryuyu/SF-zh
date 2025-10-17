@@ -15,7 +15,7 @@ I am currently working on Vol 2: PLF.
 | Logic | √ | Types | √ |
 | IndProp | √ | Stlc | √ |
 | Maps | √ | StlcProp | √ |
-| Imp | √ |
+| Imp | √ | MoreStlc | √ |
 | ImpParser | √ |
 | ImpCEvalFun | √ |
 | Auto | √ |

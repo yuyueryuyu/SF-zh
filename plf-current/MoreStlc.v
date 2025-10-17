@@ -1,4 +1,4 @@
-(** * MoreStlc: 扩展简单类型 Lambda-演算 *)
+ (** * MoreStlc: 扩展简单类型 Lambda-演算 *)
 
 Set Warnings "-notation-overridden,-parsing".
 From PLF Require Import Maps.
@@ -289,7 +289,7 @@ From Coq Require Import Strings.String.
             -----------------------------------------------        (ST_CaseInl)
             case (inl T2 v1) of inl x1 => t1 | inr x2 => t2
                            -->  [x1:=v1]t1
-
+   
             -----------------------------------------------        (ST_CaseInr)
             case (inr T1 v2) of inl x1 => t1 | inr x2 => t2
                            -->  [x2:=v2]t2
@@ -581,12 +581,31 @@ From Coq Require Import Strings.String.
            else 1 + (halve (pred (pred x)))
 
 (* 请在此处解答 *)
+      halve = fix \f:Nat -> Nat. \x:Nat.
+                    test x=0 then 0
+                    else test (pred x)= 0 then 0
+                    else 1 + (f (pred (pred x)))
 *)
 (** [] *)
 
 (** **** 练习：1 星, standard, optional (fact_steps) 
 
     请分步骤写下 [fact 1] 如何归约为正规式（假定有一般算数操作的归约规则）。
+    fact 1 = fix \f:Nat -> Nat. \x:Nat.
+                  test x=0 then 1
+                  else x * (f (pred x)) 1
+    -> fact 1 = \x:Nat. test x=0 then 1
+                        else x * (fix \f:Nat -> Nat. \x:Nat. test x=0 then 1
+                                                            else x * f(pred x)) (pred x) 
+                1
+    -> fact 1 = text 1=0 then 1
+                else 1 * (fix \f:Nat -> Nat.\x:Nat. test x=0 then 1 else x * f(pred x)) 0
+    -> 1 * (fix \f:Nat -> Nat.\x:Nat. test x=0 then 1 else x * f(pred x)) 0
+    -> 1 * \x:Nat. test x=0 then 1 else x * (fix \f: Nat -> Nat. \x:Nat. test x=0 then 1 else x * f(pred x)) (pred x)
+            0
+    -> 1 * test 0=0 then 1 else 0 * (fix \f:Nat -> Nat. \x:Nat. test x=0 then 1 else x * f(pred x)) 0
+    -> 1 * 1
+    -> 1
 
     (* 请在此处解答 *)
 *)
@@ -913,12 +932,14 @@ Fixpoint subst (x : string) (s : tm) (t : tm) : tm :=
   (* Complete the following cases. *)
 
   (* pairs *)
-  (* 请在此处解答 *)
+  | pair t1 t2 => pair (subst x s t1) (subst x s t2)
+  | fst t => fst (subst x s t)
+  | snd t => snd (subst x s t)
   (* let *)
-  (* 请在此处解答 *)
+  | tlet y t1 t2 => tlet y (subst x s t1)
+                      (if eqb_string x y then t2 else (subst x s t2))
   (* fix *)
-  (* 请在此处解答 *)
-  | _ => t  (* ... and delete this line when you finish the exercise *)
+  | tfix t => tfix (subst x s t)
   end.
 
 Notation "'[' x ':=' s ']' t" := (subst x s t) (at level 20).
@@ -1037,11 +1058,41 @@ Inductive step : tm -> tm -> Prop :=
   (* Add rules for the following extensions. *)
 
   (* 二元组 *)
-  (* 请在此处解答 *)
+  | ST_Pair1 : forall t1 t1' t2,
+      t1 --> t1' ->
+      pair t1 t2 --> pair t1' t2
+  | ST_Pair2 : forall v1 t2 t2',
+      value v1 ->
+      t2 --> t2' ->
+      pair v1 t2 --> pair v1 t2'
+  | ST_Fst1 : forall t1 t1',
+      t1 --> t1' ->
+      fst t1 --> fst t1'
+  | ST_Fst : forall v1 v2,
+      value v1 ->
+      value v2 ->
+      fst (pair v1 v2) --> v1
+  | ST_Snd1 : forall t1 t1',
+      t1 --> t1' ->
+      snd t1 --> snd t1'
+  | ST_Snd : forall v1 v2,
+      value v1 ->
+      value v2 ->
+      snd (pair v1 v2) --> v2
   (* let *)
-  (* 请在此处解答 *)
+  | ST_Let : forall x t1 t1' t2,
+      t1 --> t1' ->
+      tlet x t1 t2 --> tlet x t1' t2
+  | ST_LetValue : forall x v1 t2,
+      value v1 ->
+      tlet x v1 t2 --> [x:=v1]t2
+
   (* fix *)
-  (* 请在此处解答 *)
+  | ST_Fix1 : forall t1 t1',
+      t1 --> t1' ->
+      tfix t1 --> tfix t1'
+  | ST_FixAbs : forall x T t,
+      tfix (abs x T t) --> [x:=(tfix (abs x T t))] t
 
 where "t1 '-->' t2" := (step t1 t2).
 
@@ -1120,11 +1171,25 @@ Inductive has_type : context -> tm -> ty -> Prop :=
   (* Add rules for the following extensions. *)
 
   (* pairs *)
-  (* 请在此处解答 *)
+  | T_Pair : forall Gamma t1 T1 t2 T2,
+      Gamma |- t1 \in T1 ->
+      Gamma |- t2 \in T2 ->
+      Gamma |- (pair t1 t2) \in Prod T1 T2
+  | T_Fst : forall Gamma t T1 T2,
+      Gamma |- t \in Prod T1 T2 ->
+      Gamma |- (fst t) \in T1
+  | T_Snd : forall Gamma t T1 T2,
+      Gamma |- t \in Prod T1 T2 ->
+      Gamma |- (snd t) \in T2
   (* let *)
-  (* 请在此处解答 *)
+  | T_Let : forall Gamma x t1 T1 t2 T2,
+      Gamma |- t1 \in T1 ->
+      (update Gamma x T1) |- t2 \in T2 ->
+      Gamma |- (tlet x t1 t2) \in T2
   (* fix *)
-  (* 请在此处解答 *)
+  | T_Fix : forall Gamma t T,
+      Gamma |- t \in Arrow T T ->
+      Gamma |- (tfix t) \in T
 
 where "Gamma '|-' t '\in' T" := (has_type Gamma t T).
 
@@ -1211,15 +1276,15 @@ Proof.
   unfold test.
   (* 这里的类型导出式非常深，因此我们需要将 [auto] 的最大搜索深度从 5 改为 10。 *)
   auto 10.
-(* 请在此处解答 *) Admitted.
+Qed.
 
 Example numtest_reduces :
   test -->* const 5.
 Proof.
-(* 
+
   unfold test. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
+
 
 End Numtest.
 
@@ -1240,16 +1305,15 @@ Definition test :=
 
 Example typechecks :
   empty |- test \in Nat.
-Proof. unfold test. eauto 15. (* 请在此处解答 *) Admitted.
+Proof. unfold test. eauto 15. Qed. 
 (* GRADE_THEOREM 0.25: typechecks *)
 
 Example reduces :
   test -->* const 6.
 Proof.
-(* 
+
   unfold test. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
 (* GRADE_THEOREM 0.25: reduces *)
 
 End Prodtest.
@@ -1268,16 +1332,14 @@ Definition test :=
 
 Example typechecks :
   empty |- test \in Nat.
-Proof. unfold test. eauto 15. (* 请在此处解答 *) Admitted.
+Proof. unfold test. eauto 15. Qed.
 (* GRADE_THEOREM 0.25: typechecks *)
 
 Example reduces :
   test -->* const 6.
 Proof.
-(* 
   unfold test. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
 (* GRADE_THEOREM 0.25: reduces *)
 
 End LetTest.
@@ -1298,15 +1360,13 @@ Definition test :=
 
 Example typechecks :
   empty |- test \in Nat.
-Proof. unfold test. eauto 15. (* 请在此处解答 *) Admitted.
+Proof. unfold test. eauto 15. Qed.
 
 Example reduces :
   test -->* (const 5).
 Proof.
-(* 
   unfold test. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
 
 End Sumtest1.
 
@@ -1332,15 +1392,14 @@ Definition test :=
 
 Example typechecks :
   empty |- test \in (Prod Nat Nat).
-Proof. unfold test. eauto 15. (* 请在此处解答 *) Admitted.
+Proof. unfold test. eauto 15. Qed.
 
 Example reduces :
   test -->* (pair (const 5) (const 0)).
 Proof.
-(* 
+
   unfold test. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
 
 End Sumtest2.
 
@@ -1363,15 +1422,14 @@ Definition test :=
 
 Example typechecks :
   empty |- test \in Nat.
-Proof. unfold test. eauto 20. (* 请在此处解答 *) Admitted.
+Proof. unfold test. eauto 20. Qed.
 
 Example reduces :
   test -->* (const 25).
 Proof.
-(* 
+
   unfold test. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
 
 End ListTest.
 
@@ -1399,16 +1457,14 @@ Definition fact :=
 
 Example typechecks :
   empty |- fact \in (Arrow Nat Nat).
-Proof. unfold fact. auto 10. (* 请在此处解答 *) Admitted.
+Proof. unfold fact. auto 10. Qed.
 (* GRADE_THEOREM 0.25: typechecks *)
 
 Example reduces :
   (app fact (const 4)) -->* (const 24).
 Proof.
-(* 
   unfold fact. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
 (* GRADE_THEOREM 0.25: reduces *)
 
 End FixTest1.
@@ -1438,7 +1494,7 @@ Example typechecks :
     (Arrow (Arrow Nat Nat)
       (Arrow (List Nat)
         (List Nat))).
-Proof. unfold map. auto 10. (* 请在此处解答 *) Admitted.
+Proof. unfold map. auto 10. Qed.
 (* GRADE_THEOREM 0.25: typechecks *)
 
 Example reduces :
@@ -1446,10 +1502,8 @@ Example reduces :
          (tcons (const 1) (tcons (const 2) (tnil Nat)))
   -->* (tcons (const 2) (tcons (const 3) (tnil Nat))).
 Proof.
-(* 
   unfold map. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
 (* GRADE_THEOREM 0.25: reduces *)
 
 End FixTest2.
@@ -1479,25 +1533,21 @@ Definition equal :=
 
 Example typechecks :
   empty |- equal \in (Arrow Nat (Arrow Nat Nat)).
-Proof. unfold equal. auto 10. (* 请在此处解答 *) Admitted.
+Proof. unfold equal. auto 10. Qed.
 (* GRADE_THEOREM 0.25: typechecks *)
 
 Example reduces :
   (app (app equal (const 4)) (const 4)) -->* (const 1).
 Proof.
-(* 
   unfold equal. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
 (* GRADE_THEOREM 0.25: reduces *)
 
 Example reduces2 :
   (app (app equal (const 4)) (const 5)) -->* (const 0).
 Proof.
-(* 
   unfold equal. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
 
 End FixTest3.
 
@@ -1535,16 +1585,14 @@ Definition eotest :=
 
 Example typechecks :
   empty |- eotest \in (Prod Nat Nat).
-Proof. unfold eotest. eauto 30. (* 请在此处解答 *) Admitted.
+Proof. unfold eotest. eauto 30. Qed.
 (* GRADE_THEOREM 0.25: typechecks *)
 
 Example reduces :
   eotest -->* (pair (const 0) (const 1)).
 Proof.
-(* 
   unfold eotest. normalize.
-*)
-(* 请在此处解答 *) Admitted.
+Qed.
 (* GRADE_THEOREM 0.25: reduces *)
 
 End FixTest4.
@@ -1710,12 +1758,23 @@ Proof with eauto.
   (* Complete the proof. *)
 
   (* pairs *)
-  (* 请在此处解答 *)
+  - destruct IHHt1... destruct IHHt2...
+    + inversion H0...
+    + inversion H...
+  - destruct IHHt...
+    + inversion H; subst; try solve_by_invert...
+    + destruct H...
+  - destruct IHHt...
+    + inversion H; subst; try solve_by_invert...
+    + destruct H...
   (* let *)
-  (* 请在此处解答 *)
+  - right. destruct IHHt1... 
+    destruct H...
   (* fix *)
-  (* 请在此处解答 *)
-(* 请在此处解答 *) Admitted.
+  - right. destruct IHHt... 
+    + inversion H; subst; try solve_by_invert...
+    + destruct H...
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_progress : option (nat*string) := None.
@@ -1802,11 +1861,30 @@ Inductive appears_free_in : string -> tm -> Prop :=
   (* Add rules for the following extensions. *)
 
   (* pairs *)
-  (* 请在此处解答 *)
+  | afi_pair1 : forall x t1 t2,
+      appears_free_in x t1 ->
+      appears_free_in x (pair t1 t2)
+  | afi_pair2 : forall x t1 t2,
+      appears_free_in x t2 ->
+      appears_free_in x (pair t1 t2)
+  | afi_fst : forall x t,
+      appears_free_in x t ->
+      appears_free_in x (fst t)
+  | afi_snd : forall x t,
+      appears_free_in x t ->
+      appears_free_in x (snd t)
   (* let *)
-  (* 请在此处解答 *)
+  | afi_let1 : forall x y t1 t2,
+      appears_free_in x t1 ->
+      appears_free_in x (tlet y t1 t2)
+  | afi_let2 : forall x y t1 t2,
+      x <> y ->
+      appears_free_in x t2 ->
+      appears_free_in x (tlet y t1 t2)
   (* fix *)
-  (* 请在此处解答 *)
+  | afi_fix : forall x t,
+      appears_free_in x t ->
+      appears_free_in x (tfix t)
 .
 
 Hint Constructors appears_free_in.
@@ -1840,10 +1918,11 @@ Proof with eauto 30.
     unfold update, t_update.
     destruct (eqb_stringP x1 y)...
     destruct (eqb_stringP x2 y)...
-
-  (* Complete the proof. *)
-
-  (* 请在此处解答 *) Admitted.
+  - (* T_Let *)
+    eapply T_Let... apply IHhas_type2. intros. 
+    unfold update, t_update.
+    destruct (eqb_stringP x x0)...
+Qed.
 
 Lemma free_in_context : forall x t T Gamma,
    appears_free_in x t ->
@@ -1871,10 +1950,10 @@ Proof with eauto.
     unfold update, t_update in Hctx.
     rewrite false_eqb_string in Hctx...
     rewrite false_eqb_string in Hctx...
-
-  (* Complete the proof. *)
-
-  (* 请在此处解答 *) Admitted.
+  - (* T_Let *)
+    destruct IHHtyp2... unfold update, t_update in H.
+    rewrite false_eqb_string in H...
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_context_invariance : option (nat*string) := None.
@@ -2017,9 +2096,13 @@ Proof with eauto.
         destruct (eqb_stringP y2 z)...
         subst. rewrite false_eqb_string...
 
-  (* Complete the proof. *)
-
-  (* 请在此处解答 *) Admitted.
+  - (* T_Let *)
+    apply T_Let with T1; destruct (eqb_stringP x s)...
+    +  (* x = s *)
+      subst; rewrite update_shadow in H5...
+    +  (* x <> s *)
+      apply IHt2. rewrite update_permute... 
+Qed.
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_substitution_preserves_typing : option (nat*string) := None.
@@ -2083,12 +2166,15 @@ Proof with eauto.
   (* Complete the proof. *)
 
   (* fst and snd *)
-  (* 请在此处解答 *)
+  - (* T_Fst *)
+    inversion HT...
+  - (* T_Snd *)
+    inversion HT...
   (* let *)
-  (* 请在此处解答 *)
+  - eapply substitution_preserves_typing...
   (* fix *)
-  (* 请在此处解答 *)
-(* 请在此处解答 *) Admitted.
+  - inversion HT; eapply substitution_preserves_typing...
+Qed. 
 
 (* 请勿修改下面这一行： *)
 Definition manual_grade_for_preservation : option (nat*string) := None.
