@@ -16,7 +16,7 @@ I am currently working on Vol 2: PLF.
 | IndProp | √ | Stlc | √ |
 | Maps | √ | StlcProp | √ |
 | Imp | √ | MoreStlc | √ |
-| ImpParser | √ |
+| ImpParser | √ | Typechecking | √ |
 | ImpCEvalFun | √ |
 | Auto | √ |
 | AltAuto | √ |

@@ -345,9 +345,33 @@ Fixpoint type_check (Gamma : context) (t : tm) : option ty :=
   (* Complete the following cases. *)
   
   (* sums *)
-  (* 请在此处解答 *)
+  | tinl T2 t1 => 
+      match (type_check Gamma t1) with
+      | Some (T1) => return Sum T1 T2
+      | None => fail
+      end
+  | tinr T1 t2 =>
+      match (type_check Gamma t2) with
+      | Some (T2) => return Sum T1 T2
+      | None => fail
+      end 
+  | tcase t0 x1 t1 x2 t2 =>
+      T0 <- type_check Gamma t0 ;;
+      match T0 with
+      | Sum T1 T2 => 
+          Tx1 <- type_check (update Gamma x1 T1) t1 ;;
+          Tx2 <- type_check (update Gamma x2 T2) t2 ;;
+          if eqb_ty Tx1 Tx2 then return Tx1 else fail
+      | _ => fail
+      end
   (* lists (the [tlcase] is given for free) *)
-  (* 请在此处解答 *)
+  | tnil T => return List T
+  | tcons t1 t2 => 
+      match type_check Gamma t1, type_check Gamma t2 with
+      | Some T1, Some (List T2) =>
+          if eqb_ty T1 T2 then return List T1 else fail
+      | _, _ => fail
+      end
   | tlcase t0 t1 x21 x22 t2 =>
       match type_check Gamma t0 with
       | Some (List T) =>
@@ -360,14 +384,34 @@ Fixpoint type_check (Gamma : context) (t : tm) : option ty :=
       | _ => None
       end
   (* unit *)
-  (* 请在此处解答 *)
+  | unit => return Unit
   (* pairs *)
-  (* 请在此处解答 *)
+  | pair t1 t2 => 
+      T1 <- type_check Gamma t1 ;;
+      T2 <- type_check Gamma t2 ;;
+      return Prod T1 T2
+  | fst t =>
+      match type_check Gamma t with
+      | Some (Prod T1 T2) => return T1
+      | _ => fail
+      end
+  | snd t =>
+      match type_check Gamma t with
+      | Some (Prod T1 T2) => return T2
+      | _ => fail
+      end
   (* let *)
-  (* 请在此处解答 *)
+  | tlet x t1 t2 => 
+      T1 <- type_check Gamma t1 ;;
+      T2 <- type_check (update Gamma x T1) t2 ;;
+      return T2  
   (* fix *)
-  (* 请在此处解答 *)
-  | _ => None  (* ... and delete this line when you complete the exercise. *)
+  | tfix t =>
+      match (type_check Gamma t) with 
+      | Some (Arrow T1 T2) => 
+          if eqb_ty T1 T2 then return T1 else fail
+      | _ => fail
+      end
   end.
 
 (** Just for fun, we'll do the soundness proof with just a bit more
@@ -426,7 +470,22 @@ Proof with eauto.
     invert_typecheck Gamma t3 T3.
     destruct T1; try solve_by_invert.
     case_equality T2 T3.
-  (* 请在此处解答 *)
+  - (* tinl *) 
+    invert_typecheck Gamma t0 T0.
+  - (* tinr *)
+    invert_typecheck Gamma t0 T0.
+  - (* tcase *)
+    fully_invert_typecheck Gamma t1 T1 T11 T12.
+    invert_typecheck (update Gamma s T11) t2 T2.
+    invert_typecheck (update Gamma s0 T12) t3 T3.
+    case_equality T2 T3.
+  - (* tnil *)
+    constructor.
+  - (* tcons *)
+    invert_typecheck Gamma t1 T1.
+    invert_typecheck Gamma t2 T2.
+    analyze T2 T21 T22.
+    case_equality T1 T21.
   - (* tlcase *)
     rename s into x31. rename s0 into x32.
     fully_invert_typecheck Gamma t1 T1 T11 T12.
@@ -434,7 +493,21 @@ Proof with eauto.
     remember (update (update Gamma x32 (List T11)) x31 T11) as Gamma'2.
     invert_typecheck Gamma'2 t3 T3.
     case_equality T2 T3.
-  (* 请在此处解答 *)
+  - (* unit *)
+    constructor.
+  - (* pair *)
+    invert_typecheck Gamma t1 T1.
+    invert_typecheck Gamma t2 T2.
+  - (* fst *)
+    fully_invert_typecheck Gamma t T1 T11 T12.
+  - (* snd *)
+    fully_invert_typecheck Gamma t T1 T11 T12.
+  - (* tlet *)
+    invert_typecheck Gamma t1 T1.
+    invert_typecheck (update Gamma s T1) t2 T2.
+  - (* tfix *)
+    fully_invert_typecheck Gamma t T1 T11 T12.
+    case_equality T11 T12.
 Qed.
 
 Theorem type_checking_complete : forall Gamma t T,
@@ -451,10 +524,8 @@ Proof.
     try (rewrite (eqb_ty_refl T2)); 
     eauto.
   - destruct (Gamma x); try solve_by_invert. eauto.
-  Admitted. (* ... and delete this line *)
-(* 
-Qed. (* ... and uncomment this one *)
-*)
+Qed.
+
 End TypecheckerExtensions.
 (** [] *)
 
@@ -470,19 +541,335 @@ Module StepFunction.
 Import MoreStlc.
 Import STLCExtended.
 
-(* Operational semantics as a Coq function. *)
-Fixpoint stepf (t : tm) : option tm
-  (* 将本行替换成 ":= _你的_定义_ ." *). Admitted.
+Fixpoint bvalue (t : tm) : bool :=
+  match t with
+  | abs _ _ _ => true
+  | const _ => true
+  | tinl _ v => bvalue v
+  | tinr _ v => bvalue v 
+  | tnil _ => true
+  | tcons v1 vl => bvalue v1 && bvalue vl
+  | unit => true
+  | pair v1 v2 => bvalue v1 && bvalue v2
+  | _ => false
+  end.
 
-(* Soundness of [stepf]. *)
+Lemma bvalue_is_value : forall t,
+    bvalue t = true <-> value t.
+Proof with eauto.
+  intros. split.
+  - induction t; simpl; intros; try discriminate...
+    + rewrite andb_true_iff in H. destruct H...
+    + rewrite andb_true_iff in H. destruct H...
+  - induction t; intros; try solve_by_invert...
+    + inversion H...
+    + inversion H...
+    + simpl; rewrite andb_true_iff. inversion H...
+    + simpl; rewrite andb_true_iff. inversion H...
+Qed.
+
+Hint Rewrite bvalue_is_value.
+
+(* Operational semantics as a Coq function. *)
+Fixpoint stepf (t : tm) : option tm :=
+  match t with
+  | var x => fail
+  | abs x1 T1 t2 => fail
+  | app t1 t2 =>
+      match (stepf t1) with
+      | Some t1' => return app t1' t2
+      | _ => match (stepf t2) with
+             | Some t2' => if bvalue t1 then return app t1 t2' else fail
+             | _ => match t1 with 
+                    | abs x T t => if bvalue t2 then return [x:=t2] t else fail 
+                    | _ => fail
+                    end
+             end
+      end
+  | const _ => fail
+  | scc t1 =>
+      match (stepf t1) with
+      | Some t1' => return scc t1'
+      | _ => match t1 with
+             | const n => return const (S n)
+             | _ => fail
+             end
+      end
+  | prd t1 =>
+      match (stepf t1) with
+      | Some t1' => return prd t1'
+      | _ => match t1 with
+             | const n => return const (pred n)
+             | _ => fail
+             end
+      end
+  | mlt t1 t2 => 
+      match (stepf t1) with
+      | Some t1' => return mlt t1' t2
+      | _ => match (stepf t2) with
+             | Some t2' => if bvalue t1 then return mlt t1 t2' else fail
+             | _ => match t1, t2 with
+                    | const n1, const n2 => return const (n1 * n2)
+                    | _, _ => fail
+                    end
+             end
+      end
+  | test0 guard t f =>
+      match (stepf guard) with
+      | Some guard' => return test0 guard' t f
+      | _ => match guard with
+             | const O => return t
+             | const (S n) => return f
+             | _ => fail
+             end
+      end
+  (* Complete the following cases. *)
+  
+  (* sums *)
+  | tinl T2 t1 => 
+      match (stepf t1) with
+      | Some t1' => return tinl T2 t1'
+      | _ => fail
+      end
+  | tinr T1 t2 =>
+      match (stepf t2) with
+      | Some t2' => return tinr T1 t2'
+      | _ => fail
+      end
+  | tcase t0 x1 t1 x2 t2 =>
+      match (stepf t0) with
+      | Some t0' => return tcase t0' x1 t1 x2 t2
+      | _ => match t0 with
+             | tinl _ t11 => if bvalue t0 then return [x1:=t11] t1 else fail
+             | tinr _ t21 => if bvalue t0 then return [x2:=t21] t2 else fail
+             | _ => fail
+             end
+      end 
+  (* lists (the [tlcase] is given for free) *)
+  | tnil T => fail
+  | tcons t1 t2 => 
+      match (stepf t1) with
+      | Some t1' => return tcons t1' t2
+      | _ => match (stepf t2) with
+             | Some t2' => if bvalue t1 then return tcons t1 t2' else fail
+             | _ => fail
+             end
+      end
+  | tlcase t0 t1 x21 x22 t2 =>
+      match (stepf t0) with
+      | Some t0' => return tlcase t0' t1 x21 x22 t2
+      | _ => match t0 with
+             | tnil _ => return t1
+             | tcons v1 vl => if bvalue v1 && bvalue vl then 
+                                  return [x22:=vl] [x21:=v1] t2 
+                                  else fail
+             | _ => fail
+             end
+      end
+  (* unit *)
+  | unit => fail
+  (* pairs *)
+  | pair t1 t2 =>
+      match (stepf t1) with
+      | Some t1' => return pair t1' t2
+      | _ => match (stepf t2) with
+             | Some t2' => if bvalue t1 then return pair t1 t2' else fail
+             | _ => fail
+             end
+      end
+  | fst t =>
+      match (stepf t) with
+      | Some t' => return fst t'
+      | _ => match t with
+             | pair t1 t2 => if bvalue t1 && bvalue t2 then return t1 else fail
+             | _ => fail
+             end
+      end
+  | snd t =>
+      match (stepf t) with
+      | Some t' => return snd t'
+      | _ => match t with
+             | pair t1 t2 => if bvalue t1 && bvalue t2 then return t2 else fail
+             | _ => fail
+             end
+      end
+  (* let *)
+  | tlet x t1 t2 => 
+      match (stepf t1) with
+      | Some t1' => return tlet x t1' t2
+      | _ => if bvalue t1 then return [x:=t1] t2 else fail
+      end
+  (* fix *)
+  | tfix t =>
+      match (stepf t) with
+      | Some t' => return tfix t'
+      | _ => match t with
+             | abs f T t1 => return [f:=(tfix t)] t1
+             | _ => fail
+             end
+      end
+  end.
+
+(* Soundness of [stepf]. *) 
 Theorem sound_stepf : forall t t',
     stepf t = Some t'  ->  t --> t'.
-Proof. (* 请在此处解答 *) Admitted.
+Proof with eauto.
+  intros t. induction t; intros; try solve_by_invert.
+  - inversion H. destruct (stepf t1) eqn:Eq.
+    + inversion H1...
+    + destruct (stepf t2). destruct (bvalue t1) eqn:Eb; try discriminate.
+      * inversion H1; subst. apply ST_App2... apply bvalue_is_value in Eb... 
+      * destruct t1; try discriminate. destruct (bvalue t2) eqn:Eb; try discriminate. 
+        inversion H1; subst. apply bvalue_is_value in Eb...
+  - inversion H. destruct (stepf t) eqn:Eq.
+    + inversion H1...
+    + destruct t; try discriminate. inversion H1...
+  - inversion H. destruct (stepf t) eqn:Eq.
+    + inversion H1...
+    + destruct t; try discriminate. inversion H1...
+  - inversion H. destruct (stepf t1).
+    + inversion H1...
+    + destruct (stepf t2).
+      * destruct (bvalue t1) eqn:Eb; try discriminate. apply bvalue_is_value in Eb.
+        inversion H1...
+      * destruct t1; try discriminate. destruct t2; try discriminate.
+        inversion H1...
+  - inversion H. destruct (stepf t1). 
+    + inversion H1...
+    + destruct t1; try discriminate. destruct n; inversion H1...
+  - inversion H. destruct (stepf t0); try discriminate. inversion H1...
+  - inversion H. destruct (stepf t0); try discriminate. inversion H1...
+  - inversion H. destruct (stepf t1); try discriminate. inversion H1...
+    destruct t1; try discriminate. inversion H1; subst.
+    destruct (bvalue t1) eqn:Et; try discriminate. apply bvalue_is_value in Et. 
+    inversion H2... destruct (bvalue (tinr t t1)) eqn:Er; try discriminate.
+    apply bvalue_is_value in Er. inversion Er; subst. inversion H1... 
+  - inversion H. destruct (stepf t1); try discriminate.
+    + inversion H1...
+    + destruct (stepf t2); try discriminate. destruct (bvalue t1) eqn:Eb; try discriminate.
+      apply bvalue_is_value in Eb. inversion H1...
+  - inversion H. destruct (stepf t1); try discriminate.
+    + inversion H1...
+    + destruct t1; try discriminate.
+      * inversion H1...
+      * destruct (bvalue t1_1) eqn:Et1; try discriminate.
+        destruct (bvalue t1_2) eqn:Et2; try discriminate.
+        apply bvalue_is_value in Et1. apply bvalue_is_value in Et2.
+        inversion H1...
+  - inversion H. destruct (stepf t1); try discriminate. 
+    + inversion H1...
+    + destruct (stepf t2); try discriminate.
+      destruct (bvalue t1) eqn:Et; try discriminate.
+      apply bvalue_is_value in Et. inversion H1...
+  - inversion H. destruct (stepf t); try discriminate.
+    + inversion H1...
+    + destruct t; try discriminate.
+      destruct (bvalue t1) eqn:Et1; try discriminate.
+      destruct (bvalue t2) eqn:Et2; try discriminate.
+      apply bvalue_is_value in Et1. apply bvalue_is_value in Et2.
+      inversion H1; subst... 
+  - inversion H. destruct (stepf t); try discriminate.
+    + inversion H1...
+    + destruct t; try discriminate.
+      destruct (bvalue t1) eqn:Et1; try discriminate.
+      destruct (bvalue t2) eqn:Et2; try discriminate.
+      apply bvalue_is_value in Et1. apply bvalue_is_value in Et2.
+      inversion H1; subst...
+  - inversion H. destruct (stepf t1); try discriminate.
+    + inversion H1... 
+    + destruct (bvalue t1) eqn:Et; try discriminate.
+      apply bvalue_is_value in Et. inversion H1...
+  - inversion H. destruct (stepf t); try discriminate.
+    + inversion H1...
+    + destruct t; try discriminate.
+      inversion H1...
+Qed.
+
+Lemma value_is_fail : forall t,
+    value t -> stepf t = fail.
+Proof with eauto.
+  intros t. induction t; intros; try solve_by_invert; eauto.
+  - inversion H; subst. simpl. rewrite IHt...
+  - inversion H; subst. simpl; rewrite IHt...
+  - inversion H; subst. simpl; rewrite IHt1... rewrite IHt2...
+  - inversion H; subst. simpl; rewrite IHt1... rewrite IHt2...
+Qed.
 
 (* Completeness of [stepf]. *)
 Theorem complete_stepf : forall t t',
     t --> t'  ->  stepf t = Some t'.
-Proof. (* 请在此处解答 *) Admitted.
+Proof with eauto.
+  intros t. induction t; intros t' H; try solve_by_invert.
+  - inversion H.
+    + simpl. remember H3; clear Heqv. apply value_is_fail in H3. rewrite H3.
+      apply bvalue_is_value in v. rewrite v...
+    + simpl. rewrite (IHt1 t1')...
+    + simpl. remember H2; clear Heqv.
+      apply value_is_fail in H2. rewrite H2. rewrite (IHt2 t2')...
+      apply bvalue_is_value in v. rewrite v...
+  - inversion H...
+    simpl. rewrite (IHt t1')...
+  - inversion H... simpl; rewrite (IHt t1')...
+  - inversion H...
+    + simpl. rewrite (IHt1 t1')...
+    + simpl. remember H2; clear Heqv.
+      apply value_is_fail in H2. rewrite H2. rewrite (IHt2 t2')...
+      apply bvalue_is_value in v. rewrite v...
+  - inversion H... simpl. rewrite (IHt1 t1')...
+  - inversion H... simpl. rewrite (IHt t1')...
+  - inversion H... simpl. rewrite (IHt t1')...
+  - inversion H; subst...
+    + simpl. rewrite (IHt1 t0')...
+    + simpl. remember H6; clear Heqv.
+      apply value_is_fail in H6. rewrite H6. 
+      apply bvalue_is_value in v. rewrite v...
+    + simpl. remember H6; clear Heqv.
+      apply value_is_fail in H6. rewrite H6. 
+      apply bvalue_is_value in v. rewrite v...
+  - inversion H; subst... 
+    + simpl. rewrite (IHt1 t1')...
+    + simpl. remember H2; clear Heqv.
+      apply value_is_fail in H2. rewrite H2. rewrite (IHt2 t2')...
+      apply bvalue_is_value in v. rewrite v...
+  - inversion H; subst...
+    + simpl. rewrite (IHt1 t1')...
+    + simpl. remember H6; clear Heqv.
+      apply value_is_fail in H6. rewrite H6. 
+      apply bvalue_is_value in v. rewrite v...
+      remember H7; clear Heqv0.
+      apply value_is_fail in H7. rewrite H7. 
+      apply bvalue_is_value in v0. rewrite v0...
+  - inversion H; subst.
+    + simpl. rewrite (IHt1 t1')...
+    + simpl. remember H2; clear Heqv.
+      apply value_is_fail in H2. rewrite H2. 
+      apply bvalue_is_value in v. rewrite v...
+      rewrite (IHt2 t2')...
+  - inversion H; subst.
+    + simpl. rewrite (IHt t1')...
+    + simpl. remember H1; clear Heqv.
+      apply value_is_fail in H1. rewrite H1. 
+      apply bvalue_is_value in v. rewrite v...
+      remember H2; clear Heqv0.
+      apply value_is_fail in H2. rewrite H2. 
+      apply bvalue_is_value in v0. rewrite v0...
+  - inversion H; subst.
+    + simpl. rewrite (IHt t1')...
+    + simpl. remember H1; clear Heqv.
+      apply value_is_fail in H1. rewrite H1. 
+      apply bvalue_is_value in v. rewrite v...
+      remember H2; clear Heqv0.
+      apply value_is_fail in H2. rewrite H2. 
+      apply bvalue_is_value in v0. rewrite v0...
+  - inversion H; subst.
+    + simpl. rewrite (IHt1 t1')...
+    + simpl. remember H4; clear Heqv.
+      apply value_is_fail in H4. rewrite H4. 
+      apply bvalue_is_value in v. rewrite v...
+  - inversion H; subst...
+    simpl. rewrite (IHt t1')...
+Qed.
+     
 
 End StepFunction.
 (** [] *)
